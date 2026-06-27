@@ -8,11 +8,49 @@ import { openDB, type IDBPDatabase } from 'idb';
 
 // 数据库名称和版本
 const DB_NAME = 'novel-inakb-db';
+const OLD_DB_NAME = 'novel-kb-db';
 const DB_VERSION = 1;
 
 // ========== 数据库初始化 ==========
 
 let dbPromise: Promise<IDBPDatabase> | null = null;
+let migrationDone = false;
+
+/** 迁移旧数据库数据到新数据库 */
+async function migrateOldDB(): Promise<void> {
+  if (migrationDone) return;
+  migrationDone = true;
+
+  try {
+    // 检查旧数据库是否存在
+    const dbs = await indexedDB.databases?.();
+    const oldExists = dbs?.some((db) => db.name === OLD_DB_NAME);
+    if (!oldExists) return;
+
+    console.log('[InaKB] 检测到旧数据库，开始迁移...');
+    const oldDB = await openDB(OLD_DB_NAME, 1);
+    const storeNames = ['projects', 'characters', 'chapters', 'foreshadows', 'worldSettings'];
+
+    const newDB = await getDB();
+    for (const name of storeNames) {
+      if (oldDB.objectStoreNames.contains(name)) {
+        const data = await oldDB.getAll(name);
+        if (data.length > 0) {
+          const tx = newDB.transaction(name, 'readwrite');
+          for (const item of data) {
+            await tx.store.put(item);
+          }
+          await tx.done;
+          console.log(`[InaKB] 迁移 ${name}: ${data.length} 条`);
+        }
+      }
+    }
+    oldDB.close();
+    console.log('[InaKB] 迁移完成！');
+  } catch (err) {
+    console.warn('[InaKB] 迁移失败（可忽略，旧数据可能不存在）:', err);
+  }
+}
 
 /**
  * 获取数据库实例（单例模式）
@@ -47,6 +85,10 @@ function getDB(): Promise<IDBPDatabase> {
           store.createIndex('projectId', 'projectId');
         }
       },
+    }).then(async (db) => {
+      // 首次打开新数据库时尝试迁移旧数据
+      await migrateOldDB();
+      return db;
     });
   }
   return dbPromise;
