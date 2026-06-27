@@ -12,11 +12,12 @@ import { db } from '../db/database';
  * @returns JSON 字符串
  */
 export async function exportProject(project: Project): Promise<string> {
-  const [characters, chapters, foreshadows, worldSettings] = await Promise.all([
+  const [characters, chapters, foreshadows, worldSettings, outlines] = await Promise.all([
     db.characters.getByProject(project.id),
     db.chapters.getByProject(project.id),
     db.foreshadows.getByProject(project.id),
     db.worldSettings.getByProject(project.id),
+    db.outlines.getByProject(project.id),
   ]);
 
   const exportData: ProjectExport = {
@@ -27,6 +28,7 @@ export async function exportProject(project: Project): Promise<string> {
     chapters,
     foreshadows,
     worldSettings,
+    outlines,
   };
 
   return JSON.stringify(exportData, null, 2);
@@ -87,6 +89,8 @@ function inferTemplateType(arr: Record<string, unknown>[]): string {
 
 /** 根据单个对象的字段推断类型 */
 function inferSingleType(item: Record<string, unknown>): string {
+  // 大纲：有 sortOrder + (type 是 volume/chapter/section/scene)
+  if ('sortOrder' in item && typeof item.type === 'string' && ['volume', 'chapter', 'section', 'scene'].includes(item.type as string)) return 'outline';
   // 章节模板：有 number / wordCount 字段（最明确，先判断）
   if ('number' in item || 'wordCount' in item) return 'chapter';
   // 伏笔模板：有 firstAppearance / expectedResolution 字段
@@ -112,6 +116,7 @@ function wrapAsProjectExport(parsed: unknown): ProjectExport {
     chapters: type === 'chapter' ? arr as unknown as Chapter[] : [],
     foreshadows: type === 'foreshadow' ? arr as unknown as Foreshadow[] : [],
     worldSettings: type === 'worldSetting' ? arr as unknown as WorldSetting[] : [],
+    outlines: type === 'outline' ? arr as unknown as import('../types').OutlineNode[] : [],
   };
 }
 
@@ -354,6 +359,10 @@ export async function executeImport(
     if (w.id !== (importData.worldSettings[i]?.id)) nameMatchedIds.settings.add(w.id);
   });
 
+  // outlines 处理
+  const importOutlines = (importData.outlines || []).map((o) => ({ ...o, projectId }));
+  const existingOutlines = await db.outlines.getByProject(projectId);
+
   // Step 2: 替换角色内嵌 resource 的占位符 ID
   const finalChars = characters.map((c) => ({
     ...c,
@@ -372,6 +381,7 @@ export async function executeImport(
       chapters.length > 0 && db.chapters.addMany(chapters),
       foreshadows.length > 0 && db.foreshadows.addMany(foreshadows),
       worldSettings.length > 0 && db.worldSettings.addMany(worldSettings),
+      importOutlines.length > 0 && db.outlines.addMany(importOutlines),
     ]);
   } else {
     // 智能模式：name 匹配到的 → 更新；ID 相同 → 跳过；其余 → 新增
@@ -401,6 +411,10 @@ export async function executeImport(
       newChapters.length > 0 && db.chapters.addMany(newChapters),
       newForeshadows.length > 0 && db.foreshadows.addMany(newForeshadows),
       newSettings.length > 0 && db.worldSettings.addMany(newSettings),
+      // outlines：跳过已存在的 ID，新增其余
+      importOutlines.length > 0 && db.outlines.addMany(
+        importOutlines.filter((o) => !existingOutlines.some((eo) => eo.id === o.id))
+      ),
     ]);
   }
 }

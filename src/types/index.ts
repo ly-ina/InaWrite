@@ -155,6 +155,7 @@ export interface ProjectExport {
   chapters: Chapter[];
   foreshadows: Foreshadow[];
   worldSettings: WorldSetting[];
+  outlines?: OutlineNode[]; // 大纲节点（V3.0+）
 }
 
 // ========== 写作会话与标签 ==========
