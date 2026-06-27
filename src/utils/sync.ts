@@ -135,7 +135,7 @@ export async function uploadToGist(
   try {
     const filename = `${data.project.name}.json`;
     const body: Record<string, unknown> = {
-      description: `Novel KB: ${data.project.name}`,
+      description: `Novel InaKB: ${data.project.name}`,
       public: false,
       files: {
         [filename]: {

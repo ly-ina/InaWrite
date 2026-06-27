@@ -7,7 +7,7 @@
 import { openDB, type IDBPDatabase } from 'idb';
 
 // 数据库名称和版本
-const DB_NAME = 'novel-kb-db';
+const DB_NAME = 'novel-inakb-db';
 const DB_VERSION = 1;
 
 // ========== 数据库初始化 ==========

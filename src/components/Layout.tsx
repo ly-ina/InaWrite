@@ -89,7 +89,7 @@ export default function Layout() {
         <div className={styles.sidebarHeader}>
           {!sidebarCollapsed && (
             <h1 className={styles.logo} onClick={() => navigate('/')}>
-              Novel KB
+              Novel InaKB
             </h1>
           )}
           <button className={styles.collapseBtn} onClick={toggleSidebar} title="折叠侧边栏">

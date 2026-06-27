@@ -1,5 +1,5 @@
 /**
- * Novel KB - 核心类型定义
+ * Novel InaKB - 核心类型定义
  * 所有数据模型的 TypeScript 接口
  */
 
