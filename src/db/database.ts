@@ -17,12 +17,11 @@ let dbPromise: Promise<IDBPDatabase> | null = null;
 let migrationDone = false;
 
 /** 迁移旧数据库数据到新数据库 */
-async function migrateOldDB(): Promise<void> {
+async function migrateOldDB(newDB: IDBPDatabase): Promise<void> {
   if (migrationDone) return;
   migrationDone = true;
 
   try {
-    // 检查旧数据库是否存在
     const dbs = await indexedDB.databases?.();
     const oldExists = dbs?.some((db) => db.name === OLD_DB_NAME);
     if (!oldExists) return;
@@ -31,7 +30,6 @@ async function migrateOldDB(): Promise<void> {
     const oldDB = await openDB(OLD_DB_NAME, 1);
     const storeNames = ['projects', 'characters', 'chapters', 'foreshadows', 'worldSettings'];
 
-    const newDB = await getDB();
     for (const name of storeNames) {
       if (oldDB.objectStoreNames.contains(name)) {
         const data = await oldDB.getAll(name);
@@ -48,7 +46,7 @@ async function migrateOldDB(): Promise<void> {
     oldDB.close();
     console.log('[InaKB] 迁移完成！');
   } catch (err) {
-    console.warn('[InaKB] 迁移失败（可忽略，旧数据可能不存在）:', err);
+    console.warn('[InaKB] 迁移失败:', err);
   }
 }
 
@@ -58,38 +56,33 @@ async function migrateOldDB(): Promise<void> {
  */
 function getDB(): Promise<IDBPDatabase> {
   if (!dbPromise) {
-    dbPromise = openDB(DB_NAME, DB_VERSION, {
-      upgrade(db) {
-        // 项目表 - 用 id 作为主键
-        if (!db.objectStoreNames.contains('projects')) {
-          db.createObjectStore('projects', { keyPath: 'id' });
-        }
-        // 角色表 - projectId 索引用于按项目查询
-        if (!db.objectStoreNames.contains('characters')) {
-          const store = db.createObjectStore('characters', { keyPath: 'id' });
-          store.createIndex('projectId', 'projectId');
-        }
-        // 章节表
-        if (!db.objectStoreNames.contains('chapters')) {
-          const store = db.createObjectStore('chapters', { keyPath: 'id' });
-          store.createIndex('projectId', 'projectId');
-        }
-        // 伏笔表
-        if (!db.objectStoreNames.contains('foreshadows')) {
-          const store = db.createObjectStore('foreshadows', { keyPath: 'id' });
-          store.createIndex('projectId', 'projectId');
-        }
-        // 世界观设定表
-        if (!db.objectStoreNames.contains('worldSettings')) {
-          const store = db.createObjectStore('worldSettings', { keyPath: 'id' });
-          store.createIndex('projectId', 'projectId');
-        }
-      },
-    }).then(async (db) => {
-      // 首次打开新数据库时尝试迁移旧数据
-      await migrateOldDB();
+    dbPromise = (async () => {
+      const db = await openDB(DB_NAME, DB_VERSION, {
+        upgrade(db) {
+          if (!db.objectStoreNames.contains('projects')) {
+            db.createObjectStore('projects', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('characters')) {
+            const store = db.createObjectStore('characters', { keyPath: 'id' });
+            store.createIndex('projectId', 'projectId');
+          }
+          if (!db.objectStoreNames.contains('chapters')) {
+            const store = db.createObjectStore('chapters', { keyPath: 'id' });
+            store.createIndex('projectId', 'projectId');
+          }
+          if (!db.objectStoreNames.contains('foreshadows')) {
+            const store = db.createObjectStore('foreshadows', { keyPath: 'id' });
+            store.createIndex('projectId', 'projectId');
+          }
+          if (!db.objectStoreNames.contains('worldSettings')) {
+            const store = db.createObjectStore('worldSettings', { keyPath: 'id' });
+            store.createIndex('projectId', 'projectId');
+          }
+        },
+      });
+      await migrateOldDB(db);
       return db;
-    });
+    })();
   }
   return dbPromise;
 }
