@@ -11,7 +11,7 @@ import { useForeshadowStore } from '../store/foreshadowStore';
 import { useWorldSettingStore } from '../store/worldSettingStore';
 import { db } from '../db/database';
 import { generateId, type Tag, type TagAssignment } from '../types';
-import { generateTags } from '../utils/aiService';
+import { generateTags, getAIConfig } from '../utils/aiService';
 import styles from './Tags.module.css';
 
 /** 颜色预设 */
@@ -42,6 +42,8 @@ export default function TagsPage() {
 
   // 标签云视图
   const [selectedTagId, setSelectedTagId] = useState<string | null>(null);
+  // 搜索筛选
+  const [searchQuery, setSearchQuery] = useState('');
   // AI 生成
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiGeneratedTags, setAiGeneratedTags] = useState<{ name: string; color: string; description: string }[]>([]);
@@ -49,6 +51,11 @@ export default function TagsPage() {
 
   const handleAIGenerateTags = async () => {
     if (!currentProject) return;
+    const config = getAIConfig();
+    if (!config.apiKey) {
+      setAiTagError('请先在 AI 助手 → 设置中配置 API Key');
+      return;
+    }
     setAiGenerating(true);
     setAiTagError('');
     setAiGeneratedTags([]);
@@ -325,8 +332,19 @@ export default function TagsPage() {
 
       {/* 标签列表 */}
       <div className={styles.tagList}>
-        <h3>所有标签</h3>
-        {tags.map((tag) => (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+          <h3 style={{ margin: 0 }}>所有标签 ({tags.length})</h3>
+          <input
+            className="input"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="🔍 搜索标签..."
+            style={{ maxWidth: '200px', padding: '4px 10px', fontSize: '12px' }}
+          />
+        </div>
+        {tags
+          .filter((t) => !searchQuery || t.name.toLowerCase().includes(searchQuery.toLowerCase()) || (t.description || '').toLowerCase().includes(searchQuery.toLowerCase()))
+          .map((tag) => (
           <div key={tag.id} className={styles.tagRow}>
             <span className={styles.tagDot} style={{ background: tag.color }} />
             <span className={styles.tagName}>{tag.name}</span>
