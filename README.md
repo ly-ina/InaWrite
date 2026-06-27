@@ -86,13 +86,16 @@ novel-kb/
 │   ├── components/           # 通用组件
 │   │   ├── Layout.tsx         # 主布局（侧边栏 + 面包屑 + 内容区）
 │   │   ├── GlobalSearch.tsx   # 全局搜索（Ctrl+K）
+│   │   ├── ShortcutPanel.tsx  # 快捷键面板（按 ?）
 │   │   ├── MarkdownEditor.tsx # Markdown 编辑器（编辑/预览切换）
-│   │   └── RelationGraph.tsx  # D3 角色关系图谱
+│   │   ├── RelationGraph.tsx  # D3 角色关系图谱
+│   │   └── SettingGraph.tsx   # D3 世界观关联图谱
 │   ├── pages/                # 页面组件
 │   │   ├── Projects.tsx       # 作品列表管理
 │   │   ├── Dashboard.tsx      # 作品概览面板
 │   │   ├── Characters.tsx     # 角色管理
 │   │   ├── Chapters.tsx       # 章节管理
+│   │   ├── Timeline.tsx       # 章节时间线（拖拽排序）
 │   │   ├── Foreshadows.tsx    # 伏笔追踪看板
 │   │   ├── WorldSettings.tsx  # 世界观设定
 │   │   └── Resources.tsx      # 资源/能力追踪
@@ -110,7 +113,8 @@ novel-kb/
 │   │   └── index.ts           # 全部 TypeScript 类型定义
 │   ├── utils/
 │   │   ├── importExport.ts    # JSON 导入导出（含冲突检测）
-│   │   └── validation.ts      # 引用完整性检查与清理
+│   │   ├── validation.ts      # 引用完整性检查与清理
+│   │   └── backup.ts          # 数据备份恢复 + 创作报告生成
 │   ├── styles/
 │   │   └── global.css         # 全局样式（暗色/亮色 CSS 变量）
 │   ├── App.tsx                # 路由配置
@@ -242,29 +246,36 @@ Novel KB 支持通过 JSON 文件与 AI 写作助手协作：
 
 ## 🗺️ 路线图
 
-### ✅ 已完成 (MVP)
+### ✅ 已完成
 
 - [x] 项目管理 + IndexedDB 存储
-- [x] 角色管理（CRUD + 关系图谱 + 批量操作）
+- [x] 角色管理（CRUD + 关系图谱 D3 + 批量操作）
 - [x] 章节管理（CRUD + 伏笔关联）
-- [x] 伏笔追踪看板
-- [x] 世界观设定树
-- [x] 资源/能力追踪
+- [x] **章节时间线视图**（拖拽排序 + 角色筛选 + 伏笔可视化）
+- [x] 伏笔追踪看板（四列 Kanban）
+- [x] 世界观设定树 + **关联图谱 D3**
+- [x] 资源/能力追踪（按角色/全局表格双视图）
 - [x] JSON 导入导出（含冲突检测）
-- [x] 全局搜索
-- [x] 撤销/重做
-- [x] 引用完整性检查
-- [x] Markdown 编辑器
+- [x] 全局搜索（Ctrl+K）
+- [x] 撤销/重做（Ctrl+Z/Y）
+- [x] 引用完整性检查 + 悬空引用清理
+- [x] Markdown 编辑器（编辑/预览切换）
 - [x] 暗色/亮色主题切换
+- [x] **快捷键面板**（按 ? 查看所有快捷键）
+- [x] **写作目标追踪**（自定义字数目标 + 进度条）
+- [x] **数据备份与恢复**（localStorage 自动备份 + 手动备份 + 文件恢复）
+- [x] **创作报告导出**（Markdown 格式统计报告）
 
 ### 🚧 计划中
 
-- [ ] 章节时间线视图（按时间顺序拖拽排列）
-- [ ] 世界观设定关联图谱
-- [ ] Markdown 文件监听自动导入
-- [ ] Electron 桌面应用打包
-- [ ] 多语言支持（中文/英文）
+- [ ] Markdown 文件监听自动导入（检测文件变更自动更新数据库）
+- [ ] Electron 桌面应用打包（Windows/Mac 独立应用）
+- [ ] 多语言支持（中文/英文切换）
 - [ ] 性能优化（虚拟滚动、懒加载）
+- [ ] 角色时间线弧光（按章节展示角色成长轨迹）
+- [ ] 章节拖拽排序（可视化调整章节顺序）
+- [ ] 数据同步（WebDAV / GitHub Gist 云端同步）
+- [ ] 模板系统（预设世界观/角色模板快速创建）
 
 ---
 

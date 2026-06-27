@@ -9,6 +9,7 @@ import DashboardPage from './pages/Dashboard';
 import ProjectsPage from './pages/Projects';
 import CharactersPage from './pages/Characters';
 import ChaptersPage from './pages/Chapters';
+import TimelinePage from './pages/Timeline';
 import ForeshadowsPage from './pages/Foreshadows';
 import WorldSettingsPage from './pages/WorldSettings';
 import ResourcesPage from './pages/Resources';
@@ -29,6 +30,8 @@ export default function App() {
           <Route path="characters" element={<CharactersPage />} />
           {/* 章节管理 */}
           <Route path="chapters" element={<ChaptersPage />} />
+          {/* 章节时间线 */}
+          <Route path="timeline" element={<TimelinePage />} />
           {/* 伏笔追踪 */}
           <Route path="foreshadows" element={<ForeshadowsPage />} />
           {/* 世界观设定 */}

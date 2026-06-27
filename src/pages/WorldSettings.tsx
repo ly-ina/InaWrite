@@ -8,6 +8,7 @@ import { useWorldSettingStore } from '../store/worldSettingStore';
 import { useAppStore } from '../store/appStore';
 import { generateId, type WorldSetting, type SettingRelation } from '../types';
 import MarkdownEditor from '../components/MarkdownEditor';
+import { SettingGraph } from '../components/SettingGraph';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import styles from './WorldSettings.module.css';
@@ -53,6 +54,7 @@ export default function WorldSettingsPage() {
   const [editingRelation, setEditingRelation] = useState(false);
   const [relTarget, setRelTarget] = useState('');
   const [relType, setRelType] = useState('');
+  const [showGraph, setShowGraph] = useState(false);
 
   useEffect(() => {
     if (currentProject) {
@@ -244,11 +246,28 @@ export default function WorldSettingsPage() {
     <div className={styles.page}>
       <div className="page-header">
         <h1>世界观设定</h1>
-        <button className="btn btn-primary" onClick={() => { resetForm(); setShowCreate(true); }}>
-          + 新设定
-        </button>
+        <div className="actions">
+          {settings.length > 0 && (
+            <button className="btn" onClick={() => setShowGraph(!showGraph)}>
+              {showGraph ? '返回列表' : '关联图谱'}
+            </button>
+          )}
+          <button className="btn btn-primary" onClick={() => { resetForm(); setShowCreate(true); }}>
+            + 新设定
+          </button>
+        </div>
       </div>
 
+      {/* 关联图谱视图 */}
+      {showGraph ? (
+        <div className={styles.graphSection}>
+          <SettingGraph
+            settings={settings}
+            centerId={selectedId || undefined}
+            onNodeClick={(id) => { setSelectedId(id); setShowGraph(false); }}
+          />
+        </div>
+      ) : (
       <div className={styles.contentArea}>
         {/* 左侧树形列表 */}
         <div className={styles.listPanel}>
@@ -426,6 +445,7 @@ export default function WorldSettingsPage() {
           )}
         </div>
       </div>
+      )}
 
       {/* 创建设定模态框 */}
       {showCreate && (

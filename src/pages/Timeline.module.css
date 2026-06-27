@@ -1,0 +1,256 @@
+.page {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ========== 角色筛选 ========== */
+.charFilter {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.charFilterBtn {
+  padding: 4px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.charFilterBtn:hover {
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+.charFilterBtn.active {
+  background: rgba(201, 169, 110, 0.15);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ========== 图例 ========== */
+.legend {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.legendDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+/* ========== 时间线 ========== */
+.timeline {
+  flex: 1;
+  overflow-y: auto;
+  position: relative;
+  padding: 20px 0 40px;
+}
+
+.centerLine {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--border-color);
+  transform: translateX(-50%);
+}
+
+.timelineItem {
+  position: relative;
+  width: 46%;
+  margin-bottom: 32px;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.timelineItem.left {
+  margin-right: auto;
+  padding-right: 30px;
+}
+
+.timelineItem.right {
+  margin-left: auto;
+  padding-left: 30px;
+}
+
+.timelineItem.dragging {
+  opacity: 0.4;
+}
+
+.timelineItem.dragOver {
+  transform: scale(1.02);
+}
+
+.timelineItem.dragOver .card {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(201, 169, 110, 0.3);
+}
+
+/* ========== 时间节点 ========== */
+.node {
+  position: absolute;
+  top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.left .node {
+  right: -8px;
+}
+
+.right .node {
+  left: -8px;
+  flex-direction: row-reverse;
+}
+
+.nodeDot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 3px solid var(--bg-primary);
+  box-shadow: 0 0 0 2px var(--accent-dim);
+  z-index: 1;
+}
+
+.nodeNum {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  font-family: var(--font-mono);
+}
+
+/* ========== 内容卡片 ========== */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.card:hover {
+  border-color: var(--border-light);
+  box-shadow: var(--shadow-md);
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.cardTitle {
+  font-family: var(--font-serif);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.cardMeta {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.cardChars {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.charBadge {
+  padding: 1px 8px;
+  background: var(--bg-hover);
+  border-radius: 10px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.charBadge:hover {
+  color: var(--accent);
+}
+
+/* ========== 伏笔指示器 ========== */
+.foreshadowIndicators {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 6px;
+}
+
+.fsAdded {
+  font-size: 11px;
+  color: var(--warning);
+  padding: 2px 6px;
+  background: rgba(201, 158, 75, 0.1);
+  border-radius: 4px;
+  border-left: 2px solid var(--warning);
+}
+
+.fsResolved {
+  font-size: 11px;
+  color: var(--success);
+  padding: 2px 6px;
+  background: rgba(90, 158, 111, 0.1);
+  border-radius: 4px;
+  border-left: 2px solid var(--success);
+}
+
+.summary {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+/* ========== 详情弹窗 ========== */
+.fsDetail {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fsAddedDetail,
+.fsResolvedDetail {
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+
+.fsAddedDetail {
+  background: rgba(201, 158, 75, 0.08);
+  border-left: 3px solid var(--warning);
+}
+
+.fsResolvedDetail {
+  background: rgba(90, 158, 111, 0.08);
+  border-left: 3px solid var(--success);
+}
+
+.fsLabel {
+  font-size: 11px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: var(--text-muted);
+}

@@ -6,6 +6,7 @@
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAppStore } from '../store/appStore';
 import GlobalSearch from './GlobalSearch';
+import ShortcutPanel from './ShortcutPanel';
 import styles from './Layout.module.css';
 
 /** 顶级导航：项目列表 */
@@ -18,6 +19,7 @@ const PROJECT_NAV = [
   { path: '/dashboard', label: '概览', icon: '🏠' },
   { path: '/characters', label: '角色', icon: '👤' },
   { path: '/chapters', label: '章节', icon: '📖' },
+  { path: '/timeline', label: '时间线', icon: '📅' },
   { path: '/foreshadows', label: '伏笔', icon: '🔮' },
   { path: '/worldsettings', label: '世界观', icon: '🌍' },
   { path: '/resources', label: '资源', icon: '💎' },
@@ -30,6 +32,7 @@ const BREADCRUMB_MAP: Record<string, string> = {
   '/characters': '角色管理',
   '/chapters': '章节管理',
   '/foreshadows': '伏笔追踪',
+  '/timeline': '章节时间线',
   '/worldsettings': '世界观设定',
   '/resources': '资源追踪',
 };
@@ -67,6 +70,8 @@ export default function Layout() {
     <div className={styles.layout} data-theme={theme}>
       {/* 全局搜索（Ctrl+K） */}
       <GlobalSearch />
+      {/* 快捷键面板（?） */}
+      <ShortcutPanel />
       {/* 左侧导航栏 */}
       <aside className={`${styles.sidebar} ${sidebarCollapsed ? styles.collapsed : ''}`}>
         <div className={styles.sidebarHeader}>

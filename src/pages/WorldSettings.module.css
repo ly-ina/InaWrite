@@ -8,6 +8,13 @@
   height: calc(100vh - var(--header-height) - 80px - 36px);
 }
 
+.graphSection {
+  height: calc(100vh - var(--header-height) - 80px - 36px);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
 /* ========== 左侧列表 ========== */
 .listPanel {
   width: 300px;
