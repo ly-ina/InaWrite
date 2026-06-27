@@ -48,6 +48,12 @@ export default function TagsPage() {
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiGeneratedTags, setAiGeneratedTags] = useState<{ name: string; color: string; description: string }[]>([]);
   const [aiTagError, setAiTagError] = useState('');
+  // AI 生成前选择器
+  const [showAIPicker, setShowAIPicker] = useState(false);
+  const [aiPickChars, setAiPickChars] = useState<string[]>([]);
+  const [aiPickChapters, setAiPickChapters] = useState<string[]>([]);
+  const [aiPickSettings, setAiPickSettings] = useState<string[]>([]);
+  const [aiPickForeshadows, setAiPickForeshadows] = useState<string[]>([]);
 
   const handleAIGenerateTags = async () => {
     if (!currentProject) return;
@@ -56,15 +62,21 @@ export default function TagsPage() {
       setAiTagError('请先在 AI 助手 → 设置中配置 API Key');
       return;
     }
+    setShowAIPicker(false);
     setAiGenerating(true);
     setAiTagError('');
     setAiGeneratedTags([]);
     try {
+      const pickedChars = characters.filter((c) => aiPickChars.length === 0 || aiPickChars.includes(c.id));
+      const pickedChapters = chapters.filter((c) => aiPickChapters.length === 0 || aiPickChapters.includes(c.id));
+      const pickedSettings = settings.filter((s) => aiPickSettings.length === 0 || aiPickSettings.includes(s.id));
+      const pickedForeshadows = foreshadows.filter((f) => aiPickForeshadows.length === 0 || aiPickForeshadows.includes(f.id));
+
       const generated = await generateTags({
-        characters: characters.map((c) => ({ name: c.name, description: c.description })),
-        chapters: chapters.map((ch) => ({ title: ch.title, summary: ch.summary })),
-        settings: settings.map((s) => ({ name: s.name, description: s.description })),
-        foreshadows: foreshadows.map((f) => ({ content: f.content })),
+        characters: pickedChars.map((c) => ({ name: c.name, description: c.description })),
+        chapters: pickedChapters.map((ch) => ({ title: ch.title, summary: ch.summary })),
+        settings: pickedSettings.map((s) => ({ name: s.name, description: s.description })),
+        foreshadows: pickedForeshadows.map((f) => ({ content: f.content })),
       });
       setAiGeneratedTags(generated);
     } catch (err) {
@@ -204,7 +216,7 @@ export default function TagsPage() {
       <div className="page-header">
         <h1>🏷 标签管理</h1>
         <div className="actions">
-          <button className="btn btn-sm" onClick={handleAIGenerateTags} disabled={aiGenerating}>
+          <button className="btn btn-sm" onClick={() => { setShowAIPicker(true); setAiTagError(''); }}>
             {aiGenerating ? '⏳ AI 生成中...' : '🤖 AI 生成标签'}
           </button>
           <button className="btn btn-sm" onClick={() => { setShowAssigner(!showAssigner); }}>
@@ -393,6 +405,99 @@ export default function TagsPage() {
               <button className="btn btn-primary" onClick={saveTag} disabled={!formName.trim()}>
                 {editingTag ? '保存' : '创建'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* AI 生成标签选择器弹窗 */}
+      {showAIPicker && (
+        <div className="modal-overlay" onClick={() => setShowAIPicker(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ minWidth: '550px', maxHeight: '85vh', overflowY: 'auto' }}>
+            <h2>🤖 AI 生成标签 — 选择参考内容</h2>
+            <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '14px' }}>
+              选择要发送给 AI 分析的内容，AI 将根据所选内容生成标签。不选则默认使用全部内容。
+            </p>
+
+            {/* 角色 */}
+            <div className="form-group">
+              <label>👤 角色（{aiPickChars.length}/{characters.length}）</label>
+              <div style={{ display: 'flex', gap: '4px', marginBottom: '4px' }}>
+                <button className="btn btn-sm" onClick={() => setAiPickChars(characters.map((c) => c.id))}>全选</button>
+                <button className="btn btn-sm" onClick={() => setAiPickChars([])}>清空</button>
+              </div>
+              <div style={{ maxHeight: '120px', overflowY: 'auto', display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                {characters.map((c) => (
+                  <span key={c.id}
+                    className={`${styles.assignItem} ${aiPickChars.includes(c.id) ? styles.assigned : ''}`}
+                    onClick={() => setAiPickChars((prev) => prev.includes(c.id) ? prev.filter((x) => x !== c.id) : [...prev, c.id])}>
+                    {c.name}
+                  </span>
+                ))}
+                {characters.length === 0 && <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>无角色</span>}
+              </div>
+            </div>
+
+            {/* 章节 */}
+            <div className="form-group">
+              <label>📖 章节（{aiPickChapters.length}/{chapters.length}）</label>
+              <div style={{ display: 'flex', gap: '4px', marginBottom: '4px' }}>
+                <button className="btn btn-sm" onClick={() => setAiPickChapters(chapters.map((c) => c.id))}>全选</button>
+                <button className="btn btn-sm" onClick={() => setAiPickChapters([])}>清空</button>
+              </div>
+              <div style={{ maxHeight: '120px', overflowY: 'auto', display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                {chapters.map((ch) => (
+                  <span key={ch.id}
+                    className={`${styles.assignItem} ${aiPickChapters.includes(ch.id) ? styles.assigned : ''}`}
+                    onClick={() => setAiPickChapters((prev) => prev.includes(ch.id) ? prev.filter((x) => x !== ch.id) : [...prev, ch.id])}>
+                    第{ch.number}章 {ch.title}
+                  </span>
+                ))}
+                {chapters.length === 0 && <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>无章节</span>}
+              </div>
+            </div>
+
+            {/* 世界观设定 */}
+            <div className="form-group">
+              <label>🌍 世界观设定（{aiPickSettings.length}/{settings.length}）</label>
+              <div style={{ display: 'flex', gap: '4px', marginBottom: '4px' }}>
+                <button className="btn btn-sm" onClick={() => setAiPickSettings(settings.map((s) => s.id))}>全选</button>
+                <button className="btn btn-sm" onClick={() => setAiPickSettings([])}>清空</button>
+              </div>
+              <div style={{ maxHeight: '120px', overflowY: 'auto', display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                {settings.map((s) => (
+                  <span key={s.id}
+                    className={`${styles.assignItem} ${aiPickSettings.includes(s.id) ? styles.assigned : ''}`}
+                    onClick={() => setAiPickSettings((prev) => prev.includes(s.id) ? prev.filter((x) => x !== s.id) : [...prev, s.id])}>
+                    {s.name}
+                  </span>
+                ))}
+                {settings.length === 0 && <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>无设定</span>}
+              </div>
+            </div>
+
+            {/* 伏笔 */}
+            <div className="form-group">
+              <label>🔮 伏笔（{aiPickForeshadows.length}/{foreshadows.length}）</label>
+              <div style={{ display: 'flex', gap: '4px', marginBottom: '4px' }}>
+                <button className="btn btn-sm" onClick={() => setAiPickForeshadows(foreshadows.map((f) => f.id))}>全选</button>
+                <button className="btn btn-sm" onClick={() => setAiPickForeshadows([])}>清空</button>
+              </div>
+              <div style={{ maxHeight: '120px', overflowY: 'auto', display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                {foreshadows.map((f) => (
+                  <span key={f.id}
+                    className={`${styles.assignItem} ${aiPickForeshadows.includes(f.id) ? styles.assigned : ''}`}
+                    onClick={() => setAiPickForeshadows((prev) => prev.includes(f.id) ? prev.filter((x) => x !== f.id) : [...prev, f.id])}>
+                    {f.content.slice(0, 25)}...
+                  </span>
+                ))}
+                {foreshadows.length === 0 && <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>无伏笔</span>}
+              </div>
+            </div>
+
+            <div className="form-actions">
+              <button className="btn" onClick={() => setShowAIPicker(false)}>取消</button>
+              <button className="btn btn-primary" onClick={handleAIGenerateTags}>🤖 开始生成</button>
             </div>
           </div>
         </div>
