@@ -8,6 +8,7 @@ import { useCharacterStore } from '../store/characterStore';
 import { useChapterStore } from '../store/chapterStore';
 import { useAppStore } from '../store/appStore';
 import { generateId, STATUS_LABELS, RELATION_TYPES, RESOURCE_STATUS_LABELS, type Character, type Relation, type Resource, type ResourceStatus } from '../types';
+import ConfirmDialog from '../components/ConfirmDialog';
 import { RelationGraph } from '../components/RelationGraph';
 import MarkdownEditor from '../components/MarkdownEditor';
 import { useUndoStore } from '../store/undoStore';
@@ -63,6 +64,8 @@ export default function CharactersPage() {
   const [resName, setResName] = useState('');
   const [resType, setResType] = useState<Resource['type']>('能力');
   const [resDesc, setResDesc] = useState('');
+  // 确认弹窗
+  const [confirmDialog, setConfirmDialog] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
   const [resCost, setResCost] = useState('');
   const [resStatus, setResStatus] = useState<ResourceStatus>('已获得');
   const [resObtainedAt, setResObtainedAt] = useState('');
@@ -141,8 +144,11 @@ export default function CharactersPage() {
       confirmMsg += `\n\n⚠️ 该角色存在以下引用，删除后将自动清理：\n${refs.warnings.slice(0, 5).join('\n')}`;
       if (refs.warnings.length > 5) confirmMsg += `\n...等共 ${refs.warnings.length} 条引用`;
     }
-    if (!window.confirm(confirmMsg)) return;
+    setConfirmDialog({ title: '删除角色', message: confirmMsg, onConfirm: () => { setConfirmDialog(null); proceedDelete(); } });
+    return;
 
+    async function proceedDelete() {
+    const pid = currentProject!.id;
     // 保存到 undo 栈
     const charData = characters.find((c) => c.id === id);
     if (charData) {
@@ -155,27 +161,32 @@ export default function CharactersPage() {
     }
 
     // 先清理引用
-    await cleanupDanglingReferences('character', id, currentProject.id);
+    await cleanupDanglingReferences('character', id, pid);
     // 再删除
     await deleteCharacter(id);
     if (selectedId === id) setSelectedId(null);
-    await loadCharacters(currentProject.id);
+    await loadCharacters(pid);
+    }
   };
 
   // 批量删除
   const handleBatchDelete = async () => {
     if (!currentProject || selectedIds.size === 0) return;
     const names = characters.filter((c) => selectedIds.has(c.id)).map((c) => c.name);
-    if (!window.confirm(`确定要删除以下 ${selectedIds.size} 个角色吗？\n${names.join('\n')}`)) return;
+    setConfirmDialog({ title: '批量删除角色', message: `确定要删除以下 ${selectedIds.size} 个角色吗？\n${names.join('\n')}`, onConfirm: () => { setConfirmDialog(null); doBatchDelete(); } });
+    return;
 
+    async function doBatchDelete() {
+    const pid = currentProject!.id;
     for (const id of selectedIds) {
-      await cleanupDanglingReferences('character', id, currentProject.id);
+      await cleanupDanglingReferences('character', id, pid);
       await deleteCharacter(id);
     }
     setSelectedIds(new Set());
     setBatchMode(false);
     setSelectedId(null);
-    await loadCharacters(currentProject.id);
+    await loadCharacters(pid);
+    }
   };
 
   // 批量改状态
@@ -853,6 +864,18 @@ export default function CharactersPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* 确认弹窗 */}
+      {confirmDialog && (
+        <ConfirmDialog
+          title={confirmDialog.title}
+          message={confirmDialog.message}
+          danger
+          confirmLabel="确认删除"
+          onConfirm={confirmDialog.onConfirm}
+          onCancel={() => setConfirmDialog(null)}
+        />
       )}
     </div>
   );

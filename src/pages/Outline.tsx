@@ -12,6 +12,7 @@ import { useWorldSettingStore } from '../store/worldSettingStore';
 import { useChapterStore } from '../store/chapterStore';
 import { generateId, type OutlineNode, type OutlineNodeType } from '../types';
 import { optimizeOutline, type OutlineNodeInfo, type OutlineOptimizeResult } from '../utils/aiService';
+import ConfirmDialog from '../components/ConfirmDialog';
 import styles from './Outline.module.css';
 
 /** 节点类型配置 */
@@ -47,6 +48,10 @@ export default function OutlinePage() {
   const [editForesResolved, setEditForesResolved] = useState<string[]>([]);
   const [editWorldIntro, setEditWorldIntro] = useState<string[]>([]);
 
+  // 选择器弹窗
+  const [pickerOpen, setPickerOpen] = useState<'chars' | 'foresPlanted' | 'foresResolved' | 'worldIntro' | null>(null);
+  const [pickerSearch, setPickerSearch] = useState('');
+
   // 新增节点（挂在哪个父节点下）
   const [addingParentId, setAddingParentId] = useState<string | null>(null);
 
@@ -75,6 +80,8 @@ export default function OutlinePage() {
   const [aiOptimizing, setAiOptimizing] = useState(false);
   const [optimizeResult, setOptimizeResult] = useState<OutlineOptimizeResult | null>(null);
   const [aiError, setAiError] = useState('');
+  // 确认弹窗
+  const [confirmDialog, setConfirmDialog] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
 
   /** AI 优化大纲 */
   const handleAIOptimize = async () => {
@@ -246,10 +253,12 @@ export default function OutlinePage() {
     cancelEdit();
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('确定删除该节点及其所有子节点？')) return;
-    await deleteNode(id);
-    await loadNodes(currentProject!.id);
+  const handleDelete = (id: string) => {
+    setConfirmDialog({
+      title: '删除大纲节点',
+      message: '确定删除该节点及其所有子节点？',
+      onConfirm: async () => { setConfirmDialog(null); await deleteNode(id); await loadNodes(currentProject!.id); },
+    });
   };
 
   // ===== 拖拽操作 =====
@@ -483,61 +492,69 @@ export default function OutlinePage() {
       {/* 关联角色 */}
       <div className="form-group">
         <label>计划出场角色</label>
-        <div className={styles.chipList}>
-          {characters.map((c) => (
-            <span key={c.id}
-              className={`${styles.chip} ${editChars.includes(c.id) ? styles.chipActive : ''}`}
-              onClick={() => toggleArrayItem(editChars, c.id, setEditChars)}>
-              {c.name}
-            </span>
-          ))}
-          {characters.length === 0 && <span className={styles.muted}>暂无角色</span>}
-        </div>
+        <button className="btn btn-sm" onClick={(e) => { e.preventDefault(); setPickerOpen('chars'); setPickerSearch(''); }}>
+          👤 选择角色 ({editChars.length})
+        </button>
+        {editChars.length > 0 && (
+          <div className={styles.chipList} style={{ marginTop: '6px' }}>
+            {editChars.map((id) => {
+              const c = characters.find((x) => x.id === id);
+              return c ? <span key={id} className={styles.chip} style={{ cursor: 'pointer' }}
+                onClick={() => setEditChars((prev) => prev.filter((x) => x !== id))}>✕ {c.name}</span> : null;
+            })}
+          </div>
+        )}
       </div>
 
       {/* 关联伏笔（埋设） */}
       <div className="form-group">
         <label>计划埋设伏笔</label>
-        <div className={styles.chipList}>
-          {foreshadows.map((f) => (
-            <span key={f.id}
-              className={`${styles.chip} ${editForesPlanted.includes(f.id) ? styles.chipActive : ''}`}
-              onClick={() => toggleArrayItem(editForesPlanted, f.id, setEditForesPlanted)}>
-              {f.content.slice(0, 15)}...
-            </span>
-          ))}
-          {foreshadows.length === 0 && <span className={styles.muted}>暂无伏笔</span>}
-        </div>
+        <button className="btn btn-sm" onClick={(e) => { e.preventDefault(); setPickerOpen('foresPlanted'); setPickerSearch(''); }}>
+          🔮 选择伏笔 ({editForesPlanted.length})
+        </button>
+        {editForesPlanted.length > 0 && (
+          <div className={styles.chipList} style={{ marginTop: '6px' }}>
+            {editForesPlanted.map((id) => {
+              const f = foreshadows.find((x) => x.id === id);
+              return f ? <span key={id} className={styles.chip} style={{ cursor: 'pointer' }}
+                onClick={() => setEditForesPlanted((prev) => prev.filter((x) => x !== id))}>✕ {f.content.slice(0, 15)}...</span> : null;
+            })}
+          </div>
+        )}
       </div>
 
       {/* 关联伏笔（回收） */}
       <div className="form-group">
         <label>计划回收伏笔</label>
-        <div className={styles.chipList}>
-          {foreshadows.map((f) => (
-            <span key={f.id}
-              className={`${styles.chip} ${editForesResolved.includes(f.id) ? styles.chipActive : ''}`}
-              onClick={() => toggleArrayItem(editForesResolved, f.id, setEditForesResolved)}>
-              {f.content.slice(0, 15)}...
-            </span>
-          ))}
-          {foreshadows.length === 0 && <span className={styles.muted}>暂无伏笔</span>}
-        </div>
+        <button className="btn btn-sm" onClick={(e) => { e.preventDefault(); setPickerOpen('foresResolved'); setPickerSearch(''); }}>
+          ✅ 选择伏笔 ({editForesResolved.length})
+        </button>
+        {editForesResolved.length > 0 && (
+          <div className={styles.chipList} style={{ marginTop: '6px' }}>
+            {editForesResolved.map((id) => {
+              const f = foreshadows.find((x) => x.id === id);
+              return f ? <span key={id} className={styles.chip} style={{ cursor: 'pointer' }}
+                onClick={() => setEditForesResolved((prev) => prev.filter((x) => x !== id))}>✕ {f.content.slice(0, 15)}...</span> : null;
+            })}
+          </div>
+        )}
       </div>
 
       {/* 引入世界观设定 */}
       <div className="form-group">
         <label>计划引入世界观设定</label>
-        <div className={styles.chipList}>
-          {settings.map((s) => (
-            <span key={s.id}
-              className={`${styles.chip} ${editWorldIntro.includes(s.id) ? styles.chipActive : ''}`}
-              onClick={() => toggleArrayItem(editWorldIntro, s.id, setEditWorldIntro)}>
-              {s.name}
-            </span>
-          ))}
-          {settings.length === 0 && <span className={styles.muted}>暂无设定</span>}
-        </div>
+        <button className="btn btn-sm" onClick={(e) => { e.preventDefault(); setPickerOpen('worldIntro'); setPickerSearch(''); }}>
+          🌍 选择设定 ({editWorldIntro.length})
+        </button>
+        {editWorldIntro.length > 0 && (
+          <div className={styles.chipList} style={{ marginTop: '6px' }}>
+            {editWorldIntro.map((id) => {
+              const s = settings.find((x) => x.id === id);
+              return s ? <span key={id} className={styles.chip} style={{ cursor: 'pointer' }}
+                onClick={() => setEditWorldIntro((prev) => prev.filter((x) => x !== id))}>✕ {s.name}</span> : null;
+            })}
+          </div>
+        )}
       </div>
 
       {/* 备注 */}
@@ -767,6 +784,123 @@ export default function OutlinePage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* 选择器弹窗（角色/伏笔/设定） */}
+      {pickerOpen && (
+        <div className="modal-overlay" onClick={() => setPickerOpen(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ minWidth: '450px', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
+            <h2>
+              {pickerOpen === 'chars' ? '👤 选择出场角色' :
+               pickerOpen === 'foresPlanted' ? '🔮 选择埋设伏笔' :
+               pickerOpen === 'foresResolved' ? '✅ 选择回收伏笔' : '🌍 选择引入设定'}
+            </h2>
+
+            {/* 搜索框 */}
+            <input
+              className="input"
+              value={pickerSearch}
+              onChange={(e) => setPickerSearch(e.target.value)}
+              placeholder="🔍 搜索..."
+              style={{ marginBottom: '12px' }}
+              autoFocus
+            />
+
+            {/* 列表 */}
+            <div style={{ flex: 1, overflowY: 'auto', maxHeight: '350px' }}>
+              {pickerOpen === 'chars' && characters
+                .filter((c) => !pickerSearch || c.name.includes(pickerSearch) || (c.description || '').includes(pickerSearch))
+                .map((c) => (
+                  <label key={c.id} style={{
+                    display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px',
+                    cursor: 'pointer', borderRadius: 'var(--radius-sm)', marginBottom: '2px',
+                    background: editChars.includes(c.id) ? 'rgba(201,169,110,0.08)' : 'transparent',
+                  }}>
+                    <input type="checkbox" checked={editChars.includes(c.id)}
+                      onChange={() => toggleArrayItem(editChars, c.id, setEditChars)} />
+                    <span style={{ fontWeight: 500 }}>{c.name}</span>
+                    {c.race && <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{c.race}</span>}
+                  </label>
+                ))}
+
+              {pickerOpen === 'foresPlanted' && foreshadows
+                .filter((f) => !pickerSearch || f.content.includes(pickerSearch))
+                .map((f) => (
+                  <label key={f.id} style={{
+                    display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px',
+                    cursor: 'pointer', borderRadius: 'var(--radius-sm)', marginBottom: '2px',
+                    background: editForesPlanted.includes(f.id) ? 'rgba(201,169,110,0.08)' : 'transparent',
+                  }}>
+                    <input type="checkbox" checked={editForesPlanted.includes(f.id)}
+                      onChange={() => toggleArrayItem(editForesPlanted, f.id, setEditForesPlanted)} />
+                    <span style={{ flex: 1 }}>{f.content}</span>
+                    <span className={`tag tag-${f.status}`} style={{ fontSize: '10px' }}>{f.status === 'pending' ? '未触发' : f.status === 'active' ? '进行中' : f.status === 'resolved' ? '已回收' : '已放弃'}</span>
+                  </label>
+                ))}
+
+              {pickerOpen === 'foresResolved' && foreshadows
+                .filter((f) => !pickerSearch || f.content.includes(pickerSearch))
+                .map((f) => (
+                  <label key={f.id} style={{
+                    display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px',
+                    cursor: 'pointer', borderRadius: 'var(--radius-sm)', marginBottom: '2px',
+                    background: editForesResolved.includes(f.id) ? 'rgba(201,169,110,0.08)' : 'transparent',
+                  }}>
+                    <input type="checkbox" checked={editForesResolved.includes(f.id)}
+                      onChange={() => toggleArrayItem(editForesResolved, f.id, setEditForesResolved)} />
+                    <span style={{ flex: 1 }}>{f.content}</span>
+                    <span className={`tag tag-${f.status}`} style={{ fontSize: '10px' }}>{f.status === 'pending' ? '未触发' : f.status === 'active' ? '进行中' : f.status === 'resolved' ? '已回收' : '已放弃'}</span>
+                  </label>
+                ))}
+
+              {pickerOpen === 'worldIntro' && settings
+                .filter((s) => !pickerSearch || s.name.includes(pickerSearch) || (s.description || '').includes(pickerSearch))
+                .map((s) => (
+                  <label key={s.id} style={{
+                    display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px',
+                    cursor: 'pointer', borderRadius: 'var(--radius-sm)', marginBottom: '2px',
+                    background: editWorldIntro.includes(s.id) ? 'rgba(201,169,110,0.08)' : 'transparent',
+                  }}>
+                    <input type="checkbox" checked={editWorldIntro.includes(s.id)}
+                      onChange={() => toggleArrayItem(editWorldIntro, s.id, setEditWorldIntro)} />
+                    <span style={{ fontWeight: 500 }}>{s.name}</span>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                      {s.type === 'location' ? '📍' : s.type === 'race' ? '👥' : s.type === 'item' ? '🗡️' : s.type === 'concept' ? '💡' : s.type === 'history' ? '📜' : '🏷'}
+                    </span>
+                  </label>
+                ))}
+            </div>
+
+            <div className="form-actions">
+              <button className="btn btn-sm" onClick={() => {
+                if (pickerOpen === 'chars') setEditChars(characters.map((c) => c.id));
+                else if (pickerOpen === 'foresPlanted') setEditForesPlanted(foreshadows.map((f) => f.id));
+                else if (pickerOpen === 'foresResolved') setEditForesResolved(foreshadows.map((f) => f.id));
+                else setEditWorldIntro(settings.map((s) => s.id));
+              }}>全选</button>
+              <button className="btn btn-sm" onClick={() => {
+                if (pickerOpen === 'chars') setEditChars([]);
+                else if (pickerOpen === 'foresPlanted') setEditForesPlanted([]);
+                else if (pickerOpen === 'foresResolved') setEditForesResolved([]);
+                else setEditWorldIntro([]);
+              }}>清空</button>
+              <div style={{ flex: 1 }} />
+              <button className="btn btn-primary" onClick={() => setPickerOpen(null)}>确定</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 确认弹窗 */}
+      {confirmDialog && (
+        <ConfirmDialog
+          title={confirmDialog.title}
+          message={confirmDialog.message}
+          danger
+          confirmLabel="确认删除"
+          onConfirm={confirmDialog.onConfirm}
+          onCancel={() => setConfirmDialog(null)}
+        />
       )}
     </div>
   );
