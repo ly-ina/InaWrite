@@ -7,7 +7,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useCharacterStore } from '../store/characterStore';
 import { useChapterStore } from '../store/chapterStore';
 import { useAppStore } from '../store/appStore';
-import { generateId, STATUS_LABELS, type Character, type Relation, type Resource } from '../types';
+import { generateId, STATUS_LABELS, RELATION_TYPES, RESOURCE_STATUS_LABELS, type Character, type Relation, type Resource, type ResourceStatus } from '../types';
 import { RelationGraph } from '../components/RelationGraph';
 import MarkdownEditor from '../components/MarkdownEditor';
 import { useUndoStore } from '../store/undoStore';
@@ -44,18 +44,27 @@ export default function CharactersPage() {
   const [formDesc, setFormDesc] = useState('');
   const [formAppearance, setFormAppearance] = useState('');
   const [formPersonality, setFormPersonality] = useState('');
+  const [formLocation, setFormLocation] = useState('');
+  const [formArc, setFormArc] = useState('');
+  const [formSecret, setFormSecret] = useState('');
+  const [formVoice, setFormVoice] = useState('');
 
   // 关系编辑
   const [editingRelation, setEditingRelation] = useState(false);
   const [relTarget, setRelTarget] = useState('');
-  const [relType, setRelType] = useState('');
+  const [relType, setRelType] = useState('朋友');
+  const [relDirection, setRelDirection] = useState<Relation['direction']>('双向');
+  const [relPublic, setRelPublic] = useState(true);
+  const [relDesc, setRelDesc] = useState('');
 
   // 资源编辑
   const [editingResource, setEditingResource] = useState(false);
   const [resName, setResName] = useState('');
-  const [resType, setResType] = useState('');
+  const [resType, setResType] = useState<Resource['type']>('能力');
   const [resDesc, setResDesc] = useState('');
   const [resCost, setResCost] = useState('');
+  const [resStatus, setResStatus] = useState<ResourceStatus>('已获得');
+  const [resObtainedAt, setResObtainedAt] = useState('');
 
   // 加载数据
   useEffect(() => {
@@ -98,6 +107,10 @@ export default function CharactersPage() {
       personality: formPersonality.trim() || undefined,
       description: formDesc.trim(),
       status: formStatus,
+      currentLocation: formLocation.trim() || undefined,
+      arc: formArc.trim() || undefined,
+      secret: formSecret.trim() || undefined,
+      voice: formVoice.trim() || undefined,
       relations: [],
       resources: [],
       appearances: [],
@@ -190,13 +203,22 @@ export default function CharactersPage() {
   // ===== 关系操作 =====
   const addRelation = () => {
     if (!relTarget || !relType || !selectedChar) return;
-    const newRel: Relation = { targetId: relTarget, type: relType };
+    const newRel: Relation = {
+      targetId: relTarget,
+      type: relType,
+      direction: relDirection,
+      description: relDesc || undefined,
+      isPublic: relPublic,
+    };
     const updated = { ...selectedChar, relations: [...selectedChar.relations, newRel] };
     updateCharacter(updated).then(() => {
       loadCharacters(currentProject!.id);
       setEditingRelation(false);
       setRelTarget('');
-      setRelType('');
+      setRelType('朋友');
+      setRelDesc('');
+      setRelDirection('双向');
+      setRelPublic(true);
     });
   };
 
@@ -217,6 +239,8 @@ export default function CharactersPage() {
       name: resName,
       type: resType || '其他',
       description: resDesc,
+      status: resStatus,
+      obtainedAt: resObtainedAt || undefined,
       cost: resCost || undefined,
     };
     const updated = { ...selectedChar, resources: [...selectedChar.resources, newRes] };
@@ -224,9 +248,11 @@ export default function CharactersPage() {
       loadCharacters(currentProject!.id);
       setEditingResource(false);
       setResName('');
-      setResType('');
+      setResType('能力');
       setResDesc('');
       setResCost('');
+      setResStatus('已获得');
+      setResObtainedAt('');
     });
   };
 
@@ -253,6 +279,10 @@ export default function CharactersPage() {
     setFormDesc('');
     setFormAppearance('');
     setFormPersonality('');
+    setFormLocation('');
+    setFormArc('');
+    setFormSecret('');
+    setFormVoice('');
   };
 
   // 获取角色名字的辅助函数
@@ -482,6 +512,12 @@ export default function CharactersPage() {
                 {/* 基本信息 */}
                 <section className={styles.section}>
                   <h3>基本信息</h3>
+                  {selectedChar.currentLocation && (
+                    <div className={styles.infoRow}>
+                      <span className={styles.infoLabel}>所在地</span>
+                      <span className={styles.locationBadge}>📍 {selectedChar.currentLocation}</span>
+                    </div>
+                  )}
                   {selectedChar.appearance && (
                     <div className={styles.infoRow}>
                       <span className={styles.infoLabel}>外貌</span>
@@ -492,6 +528,12 @@ export default function CharactersPage() {
                     <div className={styles.infoRow}>
                       <span className={styles.infoLabel}>性格</span>
                       <span>{selectedChar.personality}</span>
+                    </div>
+                  )}
+                  {selectedChar.voice && (
+                    <div className={styles.infoRow}>
+                      <span className={styles.infoLabel}>语言风格</span>
+                      <span className={styles.voiceText}>💬 {selectedChar.voice}</span>
                     </div>
                   )}
                   <div className={styles.infoRow}>
@@ -505,6 +547,26 @@ export default function CharactersPage() {
                     </div>
                   </div>
                 </section>
+
+                {/* 角色弧光 */}
+                {selectedChar.arc && (
+                  <section className={styles.section}>
+                    <h3>📈 角色弧光</h3>
+                    <div className={styles.mdContent}>
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{selectedChar.arc}</ReactMarkdown>
+                    </div>
+                  </section>
+                )}
+
+                {/* 秘密（仅作者可见） */}
+                {selectedChar.secret && (
+                  <section className={styles.section} style={{ borderColor: 'var(--warning)', background: 'rgba(201,158,75,0.05)', padding: '12px', borderRadius: 'var(--radius-sm)' }}>
+                    <h3 style={{ color: 'var(--warning)' }}>🔒 秘密</h3>
+                    <div className={styles.mdContent}>
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{selectedChar.secret}</ReactMarkdown>
+                    </div>
+                  </section>
+                )}
 
                 {/* 出场章节 */}
                 <section className={styles.section}>
@@ -535,6 +597,7 @@ export default function CharactersPage() {
                       {selectedChar.relations.map((rel) => (
                         <div key={rel.targetId} className={styles.relationItem}>
                           <span className={styles.relType}>{rel.type}</span>
+                          <span className={styles.relDir}>{rel.direction === '单向' ? '→' : '↔'}</span>
                           <span
                             className={styles.relTarget}
                             onClick={() => setSelectedId(rel.targetId)}
@@ -542,6 +605,8 @@ export default function CharactersPage() {
                           >
                             {getCharName(rel.targetId)}
                           </span>
+                          {!rel.isPublic && <span className={styles.relSecret} title="秘密关系">🔒</span>}
+                          {rel.description && <span className={styles.relDesc}>{rel.description}</span>}
                           <button
                             className="btn btn-sm btn-ghost"
                             onClick={() => removeRelation(rel.targetId)}
@@ -554,27 +619,33 @@ export default function CharactersPage() {
                     </div>
                   )}
                   {editingRelation && (
-                    <div className={styles.inlineForm}>
-                      <select
-                        className="select"
-                        value={relTarget}
-                        onChange={(e) => setRelTarget(e.target.value)}
-                      >
-                        <option value="">选择角色</option>
-                        {characters
-                          .filter((c) => c.id !== selectedChar.id)
-                          .map((c) => (
+                    <div className={styles.inlineForm} style={{ flexDirection: 'column', gap: '6px' }}>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <select className="select" value={relTarget} onChange={(e) => setRelTarget(e.target.value)}>
+                          <option value="">选择角色</option>
+                          {characters.filter((c) => c.id !== selectedChar.id).map((c) => (
                             <option key={c.id} value={c.id}>{c.name}</option>
                           ))}
-                      </select>
-                      <input
-                        className="input"
-                        placeholder="关系类型（如：朋友、师徒）"
-                        value={relType}
-                        onChange={(e) => setRelType(e.target.value)}
-                      />
-                      <button className="btn btn-primary btn-sm" onClick={addRelation}>确定</button>
-                      <button className="btn btn-sm" onClick={() => setEditingRelation(false)}>取消</button>
+                        </select>
+                        <select className="select" value={relType} onChange={(e) => setRelType(e.target.value)}>
+                          {RELATION_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                        <select className="select" value={relDirection} onChange={(e) => setRelDirection(e.target.value as Relation['direction'])}>
+                          <option value="双向">↔ 双向</option>
+                          <option value="单向">→ 单向</option>
+                        </select>
+                        <label style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+                          <input type="checkbox" checked={relPublic} onChange={(e) => setRelPublic(e.target.checked)} />
+                          公开
+                        </label>
+                      </div>
+                      <input className="input" placeholder="关系描述（可选）" value={relDesc} onChange={(e) => setRelDesc(e.target.value)} />
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <button className="btn btn-primary btn-sm" onClick={addRelation}>确定</button>
+                        <button className="btn btn-sm" onClick={() => setEditingRelation(false)}>取消</button>
+                      </div>
                     </div>
                   )}
                 </section>
@@ -594,9 +665,13 @@ export default function CharactersPage() {
                           <div className={styles.resName}>
                             {res.name}
                             <span className={styles.resType}>{res.type}</span>
+                            <span className={`${styles.resStatus} ${styles[`resStatus${res.status}`] || ''}`}>
+                              {res.status}
+                            </span>
                           </div>
                           {res.description && <div className={styles.resDesc}>{res.description}</div>}
-                          {res.cost && <div className={styles.resCost}>代价：{res.cost}</div>}
+                          {res.obtainedAt && <div className={styles.resObtained}>📅 {res.obtainedAt}</div>}
+                          {res.cost && <div className={styles.resCost}>💸 代价：{res.cost}</div>}
                           <button
                             className="btn btn-sm btn-ghost"
                             onClick={() => removeResource(res.id)}
@@ -611,8 +686,22 @@ export default function CharactersPage() {
                   {editingResource && (
                     <div className={styles.inlineForm} style={{ flexDirection: 'column' }}>
                       <input className="input" placeholder="名称" value={resName} onChange={(e) => setResName(e.target.value)} />
-                      <input className="input" placeholder="类型（武器/技能/魔法等）" value={resType} onChange={(e) => setResType(e.target.value)} />
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <select className="select" value={resType} onChange={(e) => setResType(e.target.value as Resource['type'])}>
+                          <option value="能力">能力</option>
+                          <option value="物品">物品</option>
+                          <option value="代价">代价</option>
+                          <option value="其他">其他</option>
+                        </select>
+                        <select className="select" value={resStatus} onChange={(e) => setResStatus(e.target.value as ResourceStatus)}>
+                          <option value="未获得">未获得</option>
+                          <option value="已获得">已获得</option>
+                          <option value="已消耗">已消耗</option>
+                          <option value="进行中">进行中</option>
+                        </select>
+                      </div>
                       <textarea className="textarea" placeholder="描述" value={resDesc} onChange={(e) => setResDesc(e.target.value)} rows={2} />
+                      <input className="input" placeholder="获取时间/章节（可选）" value={resObtainedAt} onChange={(e) => setResObtainedAt(e.target.value)} />
                       <input className="input" placeholder="代价（可选）" value={resCost} onChange={(e) => setResCost(e.target.value)} />
                       <div style={{ display: 'flex', gap: '6px' }}>
                         <button className="btn btn-primary btn-sm" onClick={addResource}>确定</button>
@@ -630,47 +719,58 @@ export default function CharactersPage() {
       {/* 创建角色模态框 */}
       {showCreate && (
         <div className="modal-overlay" onClick={() => { setShowCreate(false); resetForm(); }}>
-          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ minWidth: '480px' }}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ minWidth: '520px', maxHeight: '85vh' }}>
             <h2>新建角色</h2>
             <div className="form-group">
               <label>姓名 *</label>
               <input className="input" value={formName} onChange={(e) => setFormName(e.target.value)} placeholder="角色姓名" autoFocus />
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
               <div className="form-group">
                 <label>种族</label>
-                <input className="input" value={formRace} onChange={(e) => setFormRace(e.target.value)} placeholder="如：人类、精灵" />
+                <input className="input" value={formRace} onChange={(e) => setFormRace(e.target.value)} placeholder="人类/精灵/..." />
               </div>
               <div className="form-group">
                 <label>年龄</label>
-                <input className="input" value={formAge} onChange={(e) => setFormAge(e.target.value)} placeholder="如：25岁" />
+                <input className="input" value={formAge} onChange={(e) => setFormAge(e.target.value)} placeholder="25岁" />
+              </div>
+              <div className="form-group">
+                <label>状态</label>
+                <select className="select" value={formStatus} onChange={(e) => setFormStatus(e.target.value as Character['status'])}>
+                  <option value="alive">存活</option>
+                  <option value="dead">死亡</option>
+                  <option value="unknown">未知</option>
+                  <option value="mentioned">提及</option>
+                </select>
               </div>
             </div>
             <div className="form-group">
-              <label>状态</label>
-              <select className="select" value={formStatus} onChange={(e) => setFormStatus(e.target.value as Character['status'])}>
-                <option value="alive">存活</option>
-                <option value="dead">死亡</option>
-                <option value="unknown">未知</option>
-                <option value="mentioned">提及</option>
-              </select>
+              <label>当前所在地</label>
+              <input className="input" value={formLocation} onChange={(e) => setFormLocation(e.target.value)} placeholder="光辉之城 / 未知" />
             </div>
             <div className="form-group">
               <label>外貌</label>
-              <textarea className="textarea" value={formAppearance} onChange={(e) => setFormAppearance(e.target.value)} rows={2} placeholder="描述角色的外貌特征..." />
+              <textarea className="textarea" value={formAppearance} onChange={(e) => setFormAppearance(e.target.value)} rows={2} placeholder="金色短发，蓝色眼眸，左脸颊有道伤疤..." />
             </div>
             <div className="form-group">
               <label>性格</label>
-              <textarea className="textarea" value={formPersonality} onChange={(e) => setFormPersonality(e.target.value)} rows={2} placeholder="描述角色的性格特点..." />
+              <textarea className="textarea" value={formPersonality} onChange={(e) => setFormPersonality(e.target.value)} rows={2} placeholder="勇敢正直，但怕打雷，嗜甜如命..." />
             </div>
             <div className="form-group">
-              <label>描述</label>
-              <MarkdownEditor
-                value={formDesc}
-                onChange={setFormDesc}
-                rows={5}
-                placeholder="角色的详细描述（支持 Markdown）..."
-              />
+              <label>语言风格</label>
+              <input className="input" value={formVoice} onChange={(e) => setFormVoice(e.target.value)} placeholder="说话直率带口音，激动时提高音量..." />
+            </div>
+            <div className="form-group">
+              <label>角色弧光</label>
+              <textarea className="textarea" value={formArc} onChange={(e) => setFormArc(e.target.value)} rows={2} placeholder="从逃避责任 → 接受命运 → 超越命运" />
+            </div>
+            <div className="form-group">
+              <label>秘密（仅作者可见）</label>
+              <textarea className="textarea" value={formSecret} onChange={(e) => setFormSecret(e.target.value)} rows={2} placeholder="隐藏信息，不会在导出报告中显示..." style={{ borderColor: 'var(--warning)' }} />
+            </div>
+            <div className="form-group">
+              <label>背景描述</label>
+              <MarkdownEditor value={formDesc} onChange={setFormDesc} rows={5} placeholder="角色的详细背景故事（支持 Markdown）..." />
             </div>
             <div className="form-actions">
               <button className="btn" onClick={() => { setShowCreate(false); resetForm(); }}>取消</button>

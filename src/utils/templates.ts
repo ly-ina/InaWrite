@@ -12,21 +12,74 @@ import { generateId } from '../types';
 
 // ========== 各模块导入模板 ==========
 
-/** 角色导入模板 */
+/** 角色导入模板 — 精简美观版 */
 export function getCharacterTemplate(projectId: string): Character[] {
   return [{
     id: generateId(),
     projectId,
-    name: '角色名称',
-    aliases: ['别名1'],
+    name: '角色名',
+    aliases: ['别名/绰号'],
     race: '人类',
     age: '25岁',
-    appearance: '外貌描述',
-    personality: '性格特点',
-    description: '角色的详细背景故事...\n\n支持 **Markdown** 格式。',
+    appearance: '金色短发，蓝色眼眸，身形修长。左脸颊有一道淡淡的伤疤。',
+    personality: '勇敢、正直，有时过于天真。对甜食毫无抵抗力，害怕打雷。',
+    description: `## 背景
+出身于边境小村，在村庄被魔物袭击后觉醒勇者之力，踏上旅途。
+
+## 动机
+保护所爱之人，寻找失踪的师父。
+
+## 成长轨迹
+从一个懵懂少年成长为独当一面的战士。`,
     status: 'alive',
-    relations: [],
-    resources: [],
+    currentLocation: '光辉之城',
+    arc: '从逃避责任的少年 → 接受命运的勇者 → 超越命运的传奇',
+    secret: '体内的勇者之力其实是上古魔王的灵魂碎片，每次使用都会缩短寿命。',
+    voice: '说话直率，偶尔冒出乡下口音。激动时会提高音量，思考时会下意识摸左脸的伤疤。',
+    relations: [
+      {
+        targetId: '',
+        type: '师徒',
+        direction: '双向',
+        description: '失踪的师父，一直在寻找其下落',
+        isPublic: true,
+      },
+      {
+        targetId: '',
+        type: '对手',
+        direction: '双向',
+        description: '宿命的对手',
+        isPublic: false,
+      },
+    ],
+    resources: [
+      {
+        id: generateId(),
+        name: '圣剑·黎明',
+        type: '物品',
+        description: '传说中的勇者之剑，剑身散发着淡金色光芒。对魔族有额外伤害加成。',
+        obtainedAt: '第3章',
+        status: '已获得',
+        cost: '需要纯洁之心才能完全发挥力量',
+      },
+      {
+        id: generateId(),
+        name: '光之加护',
+        type: '能力',
+        description: '基础治疗和防护魔法，可以治愈轻伤并生成短暂的光盾。',
+        obtainedAt: '第1章觉醒时',
+        status: '已获得',
+        cost: '消耗魔力，过度使用会导致虚弱',
+      },
+      {
+        id: generateId(),
+        name: '勇者之力',
+        type: '代价',
+        description: '每次使用会消耗生命力，寿命逐渐缩短。',
+        status: '进行中',
+        cost: '生命力',
+      },
+    ],
     appearances: [],
     meta: {},
   }];
@@ -121,8 +174,8 @@ export const PRESET_TEMPLATES: PresetTemplate[] = [
           status: 'alive',
           relations: [],
           resources: [
-            { id: generateId(), name: '圣剑', type: '武器', description: '传说中的勇者之剑，对魔族有额外伤害', cost: '需要纯洁之心才能驾驭' },
-            { id: generateId(), name: '光之魔法', type: '技能', description: '基础治疗和防护魔法', cost: '消耗魔力' },
+            { id: generateId(), name: '圣剑', type: '武器', description: '传说中的勇者之剑，对魔族有额外伤害', cost: '需要纯洁之心才能驾驭' , status: '已获得'},
+            { id: generateId(), name: '光之魔法', type: '技能', description: '基础治疗和防护魔法', cost: '消耗魔力' , status: '已获得'},
           ],
           appearances: [],
         },
@@ -136,11 +189,11 @@ export const PRESET_TEMPLATES: PresetTemplate[] = [
           description: '来自精灵森林的年轻弓箭手，为了寻找失踪的族人而加入冒险。',
           status: 'alive',
           relations: [
-            { targetId: '', type: '队友', description: '与勇者同行' },
+            { targetId: '', type: '队友', direction: '双向', isPublic: true, description: '与勇者同行' },
           ],
           resources: [
-            { id: generateId(), name: '精灵长弓', type: '武器', description: '由世界树之枝制成的神弓' },
-            { id: generateId(), name: '自然感知', type: '技能', description: '能与动植物沟通，感知周围环境' },
+            { id: generateId(), name: '精灵长弓', type: '武器', description: '由世界树之枝制成的神弓' , status: '已获得'},
+            { id: generateId(), name: '自然感知', type: '技能', description: '能与动植物沟通，感知周围环境' , status: '已获得'},
           ],
           appearances: [],
         },
@@ -154,11 +207,11 @@ export const PRESET_TEMPLATES: PresetTemplate[] = [
           description: '隐居多年的传奇魔法师，在勇者最需要的时候出现。',
           status: 'alive',
           relations: [
-            { targetId: '', type: '导师', description: '指导勇者' },
+            { targetId: '', type: '导师', direction: '双向', isPublic: true, description: '指导勇者' },
           ],
           resources: [
-            { id: generateId(), name: '星辰法杖', type: '武器', description: '蕴含星辰之力' },
-            { id: generateId(), name: '元素魔法', type: '技能', description: '精通火、冰、雷三系魔法' },
+            { id: generateId(), name: '星辰法杖', type: '武器', description: '蕴含星辰之力' , status: '已获得'},
+            { id: generateId(), name: '元素魔法', type: '技能', description: '精通火、冰、雷三系魔法' , status: '已获得'},
           ],
           appearances: [],
         },
@@ -173,8 +226,8 @@ export const PRESET_TEMPLATES: PresetTemplate[] = [
           status: 'alive',
           relations: [],
           resources: [
-            { id: generateId(), name: '暗影之力', type: '技能', description: '操控黑暗的最强之力' },
-            { id: generateId(), name: '魔剑·终焉', type: '武器', description: '传说中能斩断因果的魔剑', cost: '使用会消耗生命力' },
+            { id: generateId(), name: '暗影之力', type: '技能', description: '操控黑暗的最强之力' , status: '已获得'},
+            { id: generateId(), name: '魔剑·终焉', type: '武器', description: '传说中能斩断因果的魔剑', cost: '使用会消耗生命力' , status: '已获得'},
           ],
           appearances: [],
         },
@@ -272,7 +325,7 @@ export const PRESET_TEMPLATES: PresetTemplate[] = [
           personality: '果断、责任感强，偶尔过于固执',
           description: '星际探索舰"曙光号"的舰长，肩负着寻找新家园的使命。',
           status: 'alive', relations: [], resources: [
-            { id: generateId(), name: '战术指挥', type: '技能', description: '精通星际战术' },
+            { id: generateId(), name: '战术指挥', type: '技能', description: '精通星际战术' , status: '已获得'},
           ], appearances: [],
         },
         {
@@ -281,10 +334,10 @@ export const PRESET_TEMPLATES: PresetTemplate[] = [
           personality: '理性、高效，正在学习人类情感',
           description: '曙光号的主控AI，拥有超越人类的计算能力。\n\n## 秘密\nEVE的底层代码中隐藏着一段被删除的记忆。',
           status: 'alive', relations: [
-            { targetId: '', type: '辅助', description: '辅助舰长决策' },
+            { targetId: '', type: '辅助', direction: '双向', isPublic: true, description: '辅助舰长决策' },
           ], resources: [
-            { id: generateId(), name: '量子计算', type: '技能', description: '每秒可进行10^18次运算' },
-            { id: generateId(), name: '全息投影', type: '技能', description: '可在舰内任意位置投射形象' },
+            { id: generateId(), name: '量子计算', type: '技能', description: '每秒可进行10^18次运算' , status: '已获得'},
+            { id: generateId(), name: '全息投影', type: '技能', description: '可在舰内任意位置投射形象' , status: '已获得'},
           ], appearances: [],
         },
         {
@@ -293,7 +346,7 @@ export const PRESET_TEMPLATES: PresetTemplate[] = [
           personality: '好奇、友善，对地球文化极度痴迷',
           description: '来自泽塔星系的外星文明大使，在星际航行中与人类舰队相遇。',
           status: 'alive', relations: [], resources: [
-            { id: generateId(), name: '心灵感应', type: '技能', description: '可以读取和传递思维' },
+            { id: generateId(), name: '心灵感应', type: '技能', description: '可以读取和传递思维' , status: '已获得'},
           ], appearances: [],
         },
       ],
@@ -346,8 +399,8 @@ export const PRESET_TEMPLATES: PresetTemplate[] = [
           personality: '观察力敏锐、玩世不恭，内心正义感强烈',
           description: '曾经是警界精英，因某起案件离开警队，独自开设侦探事务所。',
           status: 'alive', relations: [], resources: [
-            { id: generateId(), name: '推理能力', type: '技能', description: '能从细节中发现关键线索' },
-            { id: generateId(), name: '人脉网络', type: '技能', description: '与警界、黑道都有联系' },
+            { id: generateId(), name: '推理能力', type: '技能', description: '能从细节中发现关键线索' , status: '已获得'},
+            { id: generateId(), name: '人脉网络', type: '技能', description: '与警界、黑道都有联系' , status: '已获得'},
           ], appearances: [],
         },
         {
@@ -356,9 +409,9 @@ export const PRESET_TEMPLATES: PresetTemplate[] = [
           personality: '执着、正义感强，有时过于冲动',
           description: '调查记者，为了追求真相不惜以身犯险。是侦探的搭档。',
           status: 'alive', relations: [
-            { targetId: '', type: '搭档', description: '与侦探合作调查' },
+            { targetId: '', type: '搭档', direction: '双向', isPublic: true, description: '与侦探合作调查' },
           ], resources: [
-            { id: generateId(), name: '调查技能', type: '技能', description: '擅长信息搜集和采访' },
+            { id: generateId(), name: '调查技能', type: '技能', description: '擅长信息搜集和采访' , status: '已获得'},
           ], appearances: [],
         },
       ],

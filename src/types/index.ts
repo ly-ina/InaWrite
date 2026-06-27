@@ -15,36 +15,58 @@ export interface Project {
 }
 
 // ========== 角色 ==========
+
+/** 预设关系类型枚举 */
+export const RELATION_TYPES = ['家人', '朋友', '恋人', '敌人', '对手', '师徒', '上下级', '盟友', '陌生人', '其他'] as const;
+export type RelationType = typeof RELATION_TYPES[number] | (string & {});
+
 export interface Relation {
-  targetId: string;        // 关联角色 ID
-  type: string;            // 关系类型（如「朋友」「敌人」「师徒」）
-  description?: string;
+  targetId: string;         // 关联角色 ID
+  type: RelationType;       // 关系类型（预设枚举 + 自定义）
+  direction: '单向' | '双向'; // 关系方向
+  description?: string;     // 关系描述
+  isPublic: boolean;        // 该关系是否公开（秘密关系仅作者可见）
 }
 
 export interface Character {
   id: string;
   projectId: string;
   name: string;
-  aliases?: string[];      // 别名
+  aliases?: string[];       // 别名
   race?: string;
   age?: string;
-  appearance?: string;     // 外貌描述
-  personality?: string;    // 性格描述
-  description: string;     // Markdown 描述
+  appearance?: string;      // 外貌描述（Markdown）
+  personality?: string;     // 性格描述（Markdown）
+  description: string;      // 背景故事（Markdown）
   status: 'alive' | 'dead' | 'unknown' | 'mentioned';
+  // 新增字段
+  currentLocation?: string; // 当前所在地点 ID 或自由文本
+  arc?: string;             // 角色弧光摘要（Markdown，描述角色成长轨迹）
+  secret?: string;          // 秘密（Markdown，仅作者可见的隐藏信息）
+  voice?: string;           // 语言风格提示（对写作有帮助，如"说话带东北口音""喜欢用文言句式"）
   relations: Relation[];
   resources: Resource[];
-  appearances: string[];   // 出场章节 ID
+  appearances: string[];    // 出场章节 ID
   meta?: Record<string, unknown>;
 }
 
 // ========== 资源/能力 ==========
+
+/** 资源类型 */
+export type ResourceType = '能力' | '物品' | '代价' | '其他' | (string & {});
+
+/** 资源状态 */
+export type ResourceStatus = '未获得' | '已获得' | '已消耗' | '进行中';
+
 export interface Resource {
   id: string;
   name: string;
-  type: string;            // 如「武器」「技能」「魔法」「道具」
+  type: ResourceType;
   description: string;
-  cost?: string;           // 使用代价
+  obtainedAt?: string;       // 获取时间（自由文本）
+  obtainedChapter?: string;  // 获取章节 ID
+  status: ResourceStatus;    // 获取状态
+  cost?: string;             // 代价描述（如果是能力）
   meta?: Record<string, unknown>;
 }
 
@@ -127,4 +149,18 @@ export const STATUS_LABELS: Record<string, string> = {
   active: '进行中',
   resolved: '已回收',
   abandoned: '已放弃',
+};
+
+/** 资源状态标签 */
+export const RESOURCE_STATUS_LABELS: Record<string, string> = {
+  '未获得': '未获得',
+  '已获得': '已获得',
+  '已消耗': '已消耗',
+  '进行中': '进行中',
+};
+
+/** 关系方向标签 */
+export const DIRECTION_LABELS: Record<string, string> = {
+  '单向': '→',
+  '双向': '↔',
 };

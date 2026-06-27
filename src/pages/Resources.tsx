@@ -64,8 +64,9 @@ export default function ResourcesPage() {
     const newRes: Resource = {
       id: generateId(),
       name: resName.trim(),
-      type: resType || '其他',
+      type: (resType || '其他') as Resource['type'],
       description: resDesc.trim(),
+      status: '已获得',
       cost: resCost || undefined,
     };
     const updated = { ...selectedChar, resources: [...selectedChar.resources, newRes] };
