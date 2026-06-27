@@ -89,7 +89,9 @@ novel-kb/
 │   │   ├── ShortcutPanel.tsx  # 快捷键面板（按 ?）
 │   │   ├── MarkdownEditor.tsx # Markdown 编辑器（编辑/预览切换）
 │   │   ├── RelationGraph.tsx  # D3 角色关系图谱
-│   │   └── SettingGraph.tsx   # D3 世界观关联图谱
+│   │   ├── SettingGraph.tsx   # D3 世界观关联图谱
+│   │   ├── WritingCalendar.tsx # 写作日历热力图
+│   │   └── LazyLoad.tsx       # 懒加载/虚拟滚动优化
 │   ├── pages/                # 页面组件
 │   │   ├── Projects.tsx       # 作品列表管理
 │   │   ├── Dashboard.tsx      # 作品概览面板
@@ -100,6 +102,8 @@ novel-kb/
 │   │   ├── WorldSettings.tsx  # 世界观设定
 │   │   ├── Resources.tsx      # 资源/能力追踪
 │   │   └── Templates.tsx      # 模板中心（导入模板/预设模板/完整导出）
+│   ├── i18n/                 # 多语言国际化
+│   │   └── index.tsx          # i18n Context + 中英文字典
 │   ├── store/                # Zustand 状态管理
 │   │   ├── appStore.ts        # 全局状态（项目、主题、侧边栏）
 │   │   ├── projectStore.ts    # 项目 CRUD
@@ -116,7 +120,11 @@ novel-kb/
 │   │   ├── importExport.ts    # JSON 导入导出（含冲突检测）
 │   │   ├── validation.ts      # 引用完整性检查与清理
 │   │   ├── backup.ts          # 数据备份恢复 + 创作报告生成
-│   │   └── templates.ts       # 模板生成器 + 预设模板（奇幻/科幻/悬疑）
+│   │   ├── templates.ts       # 模板生成器 + 预设模板（奇幻/科幻/悬疑）
+│   │   ├── sync.ts            # 数据同步（WebDAV / GitHub Gist）
+│   │   ├── diff.ts            # 差异对比 + 三路合并
+│   │   ├── plugin.ts          # 插件系统（自定义导入解析器）
+│   │   └── fileWatcher.ts     # Markdown 文件监听自动导入
 │   ├── styles/
 │   │   └── global.css         # 全局样式（暗色/亮色 CSS 变量）
 │   ├── App.tsx                # 路由配置
@@ -270,18 +278,22 @@ Novel KB 支持通过 JSON 文件与 AI 写作助手协作：
 - [x] **模板系统**（角色/章节/伏笔/设定导入模板下载）
 - [x] **预设模板**（奇幻冒险/科幻星际/悬疑推理，一键创建完整作品）
 - [x] **完整设定导出**（一键导出全部项目数据为 JSON）
+- [x] **多语言支持**（中/英文切换，i18n Context + 完整翻译字典）
+- [x] **写作日历热力图**（GitHub 风格贡献日历，每日字数统计）
+- [x] **Markdown 文件监听导入**（File System Access API + 轮询扫描）
+- [x] **数据同步**（WebDAV / GitHub Gist 上传下载）
+- [x] **差异对比与合并**（三路合并策略 + Markdown 差异报告）
+- [x] **插件系统**（内置 Markdown/CSV 解析器，支持注册自定义插件）
+- [x] **性能优化**（懒加载 + 虚拟滚动组件）
 
-### 🚧 计划中 (V2.0)
+### 🚧 计划中 (V3.0)
 
 - [ ] Electron 桌面应用打包（Windows/Mac 独立应用）
-- [ ] 多语言支持（中文/英文切换）
-- [ ] Markdown 文件监听自动导入（检测文件变更自动更新数据库）
-- [ ] 性能优化（虚拟滚动、懒加载）
-- [ ] 数据同步（WebDAV / GitHub Gist 云端同步）
-- [ ] 角色时间线弧光（按章节可视化角色成长轨迹）
-- [ ] 写作日历热力图（每日字数统计）
-- [ ] 协作功能（导出差异对比、合并策略优化）
-- [ ] 插件系统（自定义数据导入解析器）
+- [ ] 角色时间线弧光（按章节可视化角色成长轨迹 + 状态变化）
+- [ ] AI 写作助手集成（调用 LLM 辅助创作建议）
+- [ ] 实时协作编辑（CRDT 多人同步）
+- [ ] 语音输入（语音转文字记录灵感）
+- [ ] 移动端适配（PWA 离线可用）
 
 ---
 

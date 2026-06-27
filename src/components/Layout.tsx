@@ -5,6 +5,7 @@
 
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAppStore } from '../store/appStore';
+import { useT } from '../i18n';
 import GlobalSearch from './GlobalSearch';
 import ShortcutPanel from './ShortcutPanel';
 import styles from './Layout.module.css';
@@ -41,6 +42,7 @@ const BREADCRUMB_MAP: Record<string, string> = {
 
 export default function Layout() {
   const { currentProject, theme, toggleTheme, sidebarCollapsed, toggleSidebar, setCurrentProject } = useAppStore();
+  const { t, lang, setLang } = useT();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -119,9 +121,15 @@ export default function Layout() {
 
         <div className={styles.sidebarFooter}>
           {!sidebarCollapsed && (
-            <button className={styles.themeToggle} onClick={toggleTheme}>
-              {theme === 'dark' ? '☀️ 亮色' : '🌙 暗色'}
-            </button>
+            <>
+              <button className={styles.themeToggle} onClick={toggleTheme}>
+                {theme === 'dark' ? t('nav.themeLight') : t('nav.themeDark')}
+              </button>
+              <button className={styles.themeToggle} onClick={() => setLang(lang === 'zh' ? 'en' : 'zh')}
+                style={{ marginTop: '4px' }}>
+                {lang === 'zh' ? '🌐 English' : '🌐 中文'}
+              </button>
+            </>
           )}
         </div>
       </aside>

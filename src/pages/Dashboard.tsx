@@ -13,6 +13,7 @@ import { STATUS_LABELS } from '../types';
 import { createAutoBackup, getBackupList, deleteBackup, restoreFromFile, generateReport } from '../utils/backup';
 import { exportProject, downloadJSON } from '../utils/importExport';
 import type { BackupMeta } from '../utils/backup';
+import WritingCalendar from '../components/WritingCalendar';
 import styles from './Dashboard.module.css';
 
 /** 快捷操作按钮配置 */
@@ -148,6 +149,9 @@ export default function DashboardPage() {
           创建于 {formatDate(currentProject.createdAt)} · 最后编辑于 {formatDate(currentProject.updatedAt)}
         </p>
       </div>
+
+      {/* 写作日历热力图 */}
+      <WritingCalendar />
 
       {/* 写作目标 */}
       <section className={styles.section}>
