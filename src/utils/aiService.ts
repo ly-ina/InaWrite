@@ -101,6 +101,7 @@ export interface ExtractedCharacter {
   status?: 'alive' | 'dead' | 'unknown' | 'mentioned';
   currentLocation?: string;
   resources?: { name: string; type: string; description: string; status: string }[];
+  relations?: { targetName: string; type: string; direction: '单向' | '双向'; description: string; isPublic: boolean }[];
 }
 
 export interface ExtractedWorldSetting {
@@ -108,6 +109,7 @@ export interface ExtractedWorldSetting {
   type: 'location' | 'race' | 'item' | 'concept' | 'history' | 'custom';
   description: string;
   parentName?: string;
+  relations?: { targetName: string; type: string }[];
 }
 
 export interface ExtractedForeshadow {
@@ -199,7 +201,16 @@ export async function analyzeNovelText(
       "description": "背景介绍",
       "status": "alive|dead|unknown|mentioned",
       "currentLocation": "当前所在地点",
-      "resources": [{"name": "能力/物品名", "type": "能力|物品|代价|其他", "description": "描述", "status": "已获得|未获得|已消耗|进行中"}]
+      "resources": [{"name": "能力/物品名", "type": "能力|物品|代价|其他", "description": "描述", "status": "已获得|未获得|已消耗|进行中"}],
+      "relations": [
+        {
+          "targetName": "另一个角色名",
+          "type": "家人|朋友|恋人|敌人|对手|师徒|上下级|盟友|陌生人|其他",
+          "direction": "单向|双向",
+          "description": "关系简述",
+          "isPublic": true
+        }
+      ]
     }
   ],
   "worldSettings": [
@@ -207,7 +218,8 @@ export async function analyzeNovelText(
       "name": "设定名称",
       "type": "location|race|item|concept|history|custom",
       "description": "详细描述",
-      "parentName": "父级设定名称（可选）"
+      "parentName": "父级设定名称（可选）",
+      "relations": [{"targetName": "关联设定名", "type": "位于|属于|对抗|包含|关联"}]
     }
   ],
   "foreshadows": [
@@ -224,6 +236,8 @@ export async function analyzeNovelText(
 重要规则：
 - 只提取文本中明确存在或强烈暗示的信息，不要编造
 - 如果某个角色在已有角色列表中，请使用已有角色的名字
+- 角色 relations 中 targetName 必须是文本中出现的其他角色名
+- 世界观 relations 中 targetName 必须是文本中出现的其他设定名
 - 伏笔 confidence：high=明确埋设，medium=可能是伏笔，low=仅是暗示
 - 如果一个类别没有内容，返回空数组
 - 请用中文回复`,
@@ -253,8 +267,10 @@ export async function analyzeNovelText(
 export interface ApplyResult {
   charactersAdded: number;
   charactersUpdated: number;
+  characterRelationsAdded: number;
   worldSettingsAdded: number;
   worldSettingsUpdated: number;
+  worldSettingRelationsAdded: number;
   foreshadowsAdded: number;
 }
 
@@ -269,8 +285,10 @@ export async function applyAnalysisResult(
   const stats: ApplyResult = {
     charactersAdded: 0,
     charactersUpdated: 0,
+    characterRelationsAdded: 0,
     worldSettingsAdded: 0,
     worldSettingsUpdated: 0,
+    worldSettingRelationsAdded: 0,
     foreshadowsAdded: 0,
   };
 
@@ -283,12 +301,14 @@ export async function applyAnalysisResult(
   // === 处理角色 ===
   const charNameMap = new Map(existingChars.map((c) => [c.name.trim().toLowerCase(), c]));
 
+  // 第一遍：创建/更新角色基本信息（不处理 relations，等所有角色就位后再处理）
+  const updatedChars = new Map<string, Character>();
+
   for (const ec of result.characters) {
     const key = ec.name.trim().toLowerCase();
     const existing = charNameMap.get(key);
 
     if (existing) {
-      // 更新已有角色（只填充空字段，不覆盖已有内容）
       const updated: Character = {
         ...existing,
         race: existing.race || ec.race || existing.race,
@@ -299,7 +319,6 @@ export async function applyAnalysisResult(
         status: ec.status || existing.status,
         currentLocation: existing.currentLocation || ec.currentLocation || existing.currentLocation,
       };
-      // 合并资源（不重复添加同名资源）
       if (ec.resources?.length) {
         const existingResNames = new Set(existing.resources.map((r) => r.name));
         const newResources = ec.resources
@@ -316,9 +335,9 @@ export async function applyAnalysisResult(
         }
       }
       await db.characters.update(updated);
+      updatedChars.set(key, updated);
       stats.charactersUpdated++;
     } else {
-      // 新增角色
       const newChar: Character = {
         id: generateId(),
         projectId,
@@ -342,18 +361,55 @@ export async function applyAnalysisResult(
         appearances: [],
       };
       await db.characters.add(newChar);
+      charNameMap.set(key, newChar);
+      updatedChars.set(key, newChar);
       stats.charactersAdded++;
+    }
+  }
+
+  // 第二遍：处理角色关系（所有角色 ID 都已确定）
+  for (const ec of result.characters) {
+    if (!ec.relations?.length) continue;
+    const charKey = ec.name.trim().toLowerCase();
+    const char = updatedChars.get(charKey) || charNameMap.get(charKey);
+    if (!char) continue;
+
+    const existingTargetIds = new Set(char.relations.map((r) => r.targetId));
+    const newRelations: Relation[] = [];
+
+    for (const er of ec.relations) {
+      const targetKey = er.targetName.trim().toLowerCase();
+      const target = charNameMap.get(targetKey);
+      if (!target || target.id === char.id) continue;
+      // 避免重复添加同类型关系
+      const alreadyExists = char.relations.some(
+        (r) => r.targetId === target.id && r.type === er.type
+      );
+      if (alreadyExists) continue;
+      newRelations.push({
+        targetId: target.id,
+        type: er.type || '其他',
+        direction: er.direction || '双向',
+        description: er.description || '',
+        isPublic: er.isPublic !== false,
+      });
+    }
+
+    if (newRelations.length > 0) {
+      char.relations = [...char.relations, ...newRelations];
+      await db.characters.update(char);
+      stats.characterRelationsAdded += newRelations.length;
     }
   }
 
   // === 处理世界观设定 ===
   const settingNameMap = new Map(existingSettings.map((s) => [s.name.trim().toLowerCase(), s]));
+  const updatedSettings = new Map<string, WorldSetting>();
 
   for (const es of result.worldSettings) {
     const key = es.name.trim().toLowerCase();
     const existing = settingNameMap.get(key);
 
-    // 查找父级设定
     let parentId: string | undefined;
     if (es.parentName) {
       const parentKey = es.parentName.trim().toLowerCase();
@@ -369,6 +425,7 @@ export async function applyAnalysisResult(
         parentId: existing.parentId || parentId,
       };
       await db.worldSettings.update(updated);
+      updatedSettings.set(key, updated);
       stats.worldSettingsUpdated++;
     } else {
       const newSetting: WorldSetting = {
@@ -381,9 +438,33 @@ export async function applyAnalysisResult(
         relations: [],
       };
       await db.worldSettings.add(newSetting);
-      stats.worldSettingsAdded++;
-      // 加入 map 供后续子设定查找父级
       settingNameMap.set(key, newSetting);
+      updatedSettings.set(key, newSetting);
+      stats.worldSettingsAdded++;
+    }
+  }
+
+  // 第二遍：处理世界观关系
+  for (const es of result.worldSettings) {
+    if (!es.relations?.length) continue;
+    const key = es.name.trim().toLowerCase();
+    const setting = updatedSettings.get(key) || settingNameMap.get(key);
+    if (!setting) continue;
+
+    for (const er of es.relations) {
+      const targetKey = er.targetName.trim().toLowerCase();
+      const target = settingNameMap.get(targetKey);
+      if (!target || target.id === setting.id) continue;
+      const alreadyExists = setting.relations.some(
+        (r) => r.targetId === target.id && r.type === er.type
+      );
+      if (alreadyExists) continue;
+      setting.relations.push({ targetId: target.id, type: er.type });
+      stats.worldSettingRelationsAdded++;
+    }
+
+    if (es.relations.length > 0) {
+      await db.worldSettings.update(setting);
     }
   }
 

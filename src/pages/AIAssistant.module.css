@@ -223,6 +223,14 @@
   border-radius: 3px;
 }
 
+.relationTag {
+  font-size: 10px;
+  padding: 1px 6px;
+  background: rgba(107, 140, 201, 0.12);
+  color: #6b8cc9;
+  border-radius: 3px;
+}
+
 .muted {
   font-size: 12px;
   color: var(--text-muted);

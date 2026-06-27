@@ -298,9 +298,10 @@ export default function AIAssistantPage() {
 
               {applyStats && (
                 <div className={styles.applySuccess}>
-                  🎉 应用完成！新增角色 {applyStats.charactersAdded} 个、更新 {applyStats.charactersUpdated} 个，
-                  新增设定 {applyStats.worldSettingsAdded} 个、更新 {applyStats.worldSettingsUpdated} 个，
-                  新增伏笔 {applyStats.foreshadowsAdded} 个
+                  🎉 应用完成！
+                  角色：新增 {applyStats.charactersAdded} / 更新 {applyStats.charactersUpdated} / 关系 +{applyStats.characterRelationsAdded}；
+                  设定：新增 {applyStats.worldSettingsAdded} / 更新 {applyStats.worldSettingsUpdated} / 关系 +{applyStats.worldSettingRelationsAdded}；
+                  伏笔：+{applyStats.foreshadowsAdded}
                 </div>
               )}
 
@@ -334,6 +335,15 @@ export default function AIAssistantPage() {
                             ))}
                           </div>
                         ) : null}
+                        {c.relations?.length ? (
+                          <div className={styles.itemTags} style={{ marginTop: '4px' }}>
+                            {c.relations.map((r, j) => (
+                              <span key={j} className={styles.relationTag}>
+                                {r.direction === '单向' ? '→' : '↔'} {r.targetName}（{r.type}）
+                              </span>
+                            ))}
+                          </div>
+                        ) : null}
                       </div>
                     ))}
                     {analysisResult.characters.length === 0 && <span className={styles.muted}>未提取到新角色</span>}
@@ -356,6 +366,15 @@ export default function AIAssistantPage() {
                         </div>
                         <div className={styles.itemDesc}>{w.description.slice(0, 120)}</div>
                         {w.parentName && <div className={styles.itemMeta}>属于：{w.parentName}</div>}
+                        {w.relations?.length ? (
+                          <div className={styles.itemTags} style={{ marginTop: '4px' }}>
+                            {w.relations.map((r, j) => (
+                              <span key={j} className={styles.relationTag}>
+                                {r.type} → {r.targetName}
+                              </span>
+                            ))}
+                          </div>
+                        ) : null}
                       </div>
                     ))}
                     {analysisResult.worldSettings.length === 0 && <span className={styles.muted}>未提取到新设定</span>}
