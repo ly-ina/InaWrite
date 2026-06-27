@@ -59,6 +59,15 @@ export default function ChaptersPage() {
   const [draftWordCount, setDraftWordCount] = useState(0);
   const draftFileRef = useRef<HTMLInputElement>(null);
 
+  // 弹窗选择器（参考大纲）
+  const [pickerOpen, setPickerOpen] = useState<'chars' | 'foresAdded' | 'foresResolved' | null>(null);
+  const [pickerSearch, setPickerSearch] = useState('');
+
+  const togglePickerItem = (arr: string[], item: string, setter: (v: string[]) => void) => {
+    if (arr.includes(item)) setter(arr.filter((x) => x !== item));
+    else setter([...arr, item]);
+  };
+
   /** 从文件导入草稿内容 */
   const handleDraftFileImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -87,9 +96,23 @@ export default function ChaptersPage() {
     ? chapters.filter((c) => c.status === filterStatus)
     : chapters;
 
-  // 获取名字
-  const getCharName = (id: string) => characters.find((c) => c.id === id)?.name || '未知';
-  const getForeshadowContent = (id: string) => foreshadows.find((f) => f.id === id)?.content.slice(0, 20) || '...';
+  // 获取名字（过滤无效引用）
+  const validCharIds = useMemo(() => new Set(characters.map((c) => c.id)), [characters]);
+  const validForeshadowIds = useMemo(() => new Set(foreshadows.map((f) => f.id)), [foreshadows]);
+  const getCharName = (id: string) => characters.find((c) => c.id === id)?.name || null;
+  const getForeshadowContent = (id: string) => foreshadows.find((f) => f.id === id)?.content.slice(0, 20) || null;
+
+  // 清理章节中的无效引用
+  const cleanInvalidRefs = async (chapter: Chapter) => {
+    const cleanChars = chapter.characters.filter((id) => validCharIds.has(id));
+    const cleanAdded = chapter.foreshadowsAdded.filter((id) => validForeshadowIds.has(id));
+    const cleanResolved = chapter.foreshadowsResolved.filter((id) => validForeshadowIds.has(id));
+    if (cleanChars.length !== chapter.characters.length ||
+        cleanAdded.length !== chapter.foreshadowsAdded.length ||
+        cleanResolved.length !== chapter.foreshadowsResolved.length) {
+      await updateChapter({ ...chapter, characters: cleanChars, foreshadowsAdded: cleanAdded, foreshadowsResolved: cleanResolved });
+    }
+  };
 
   // 重置表单
   const resetForm = () => {
@@ -280,59 +303,49 @@ export default function ChaptersPage() {
               </div>
               <div className="form-group">
                 <label>出场角色</label>
-                <div style={{ maxHeight: '150px', overflow: 'auto', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                  {characters.map((c) => (
-                    <label key={c.id} style={{ fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <input type="checkbox" checked={editingChapter.characters.includes(c.id)}
-                        onChange={() => {
-                          setEditingChapter({
-                            ...editingChapter,
-                            characters: editingChapter.characters.includes(c.id)
-                              ? editingChapter.characters.filter((x) => x !== c.id)
-                              : [...editingChapter.characters, c.id],
-                          });
-                        }} />
-                      {c.name}
-                    </label>
+                <button className="btn btn-sm" style={{ width: '100%' }}
+                  onClick={(e) => { e.preventDefault(); setPickerOpen('chars'); setPickerSearch(''); }}>
+                  👤 选择角色 ({editingChapter.characters.filter((id) => validCharIds.has(id)).length})
+                </button>
+                <div className={styles.tagList} style={{ marginTop: '6px' }}>
+                  {editingChapter.characters.filter((id) => validCharIds.has(id)).map((id) => (
+                    <span key={id} className={styles.relatedTag} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      {getCharName(id)}
+                      <button style={{ cursor: 'pointer', border: 'none', background: 'none', color: 'var(--text-muted)', fontSize: '12px', padding: '0', lineHeight: 1 }}
+                        onClick={() => setEditingChapter({ ...editingChapter, characters: editingChapter.characters.filter((x) => x !== id) })}>✕</button>
+                    </span>
                   ))}
-                  {characters.length === 0 && <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>暂无角色</span>}
                 </div>
               </div>
               <div className="form-group">
                 <label>新增伏笔</label>
-                <div style={{ maxHeight: '100px', overflow: 'auto' }}>
-                  {foreshadows.map((f) => (
-                    <label key={f.id} style={{ fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <input type="checkbox" checked={editingChapter.foreshadowsAdded.includes(f.id)}
-                        onChange={() => {
-                          setEditingChapter({
-                            ...editingChapter,
-                            foreshadowsAdded: editingChapter.foreshadowsAdded.includes(f.id)
-                              ? editingChapter.foreshadowsAdded.filter((x) => x !== f.id)
-                              : [...editingChapter.foreshadowsAdded, f.id],
-                          });
-                        }} />
-                      {f.content.slice(0, 30)}...
-                    </label>
+                <button className="btn btn-sm" style={{ width: '100%' }}
+                  onClick={(e) => { e.preventDefault(); setPickerOpen('foresAdded'); setPickerSearch(''); }}>
+                  🔮 选择伏笔 ({editingChapter.foreshadowsAdded.filter((id) => validForeshadowIds.has(id)).length})
+                </button>
+                <div className={styles.tagList} style={{ marginTop: '6px' }}>
+                  {editingChapter.foreshadowsAdded.filter((id) => validForeshadowIds.has(id)).map((id) => (
+                    <span key={id} className={styles.relatedTag} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(201, 158, 75, 0.15)', color: 'var(--warning)' }}>
+                      {getForeshadowContent(id)}
+                      <button style={{ cursor: 'pointer', border: 'none', background: 'none', color: 'var(--text-muted)', fontSize: '12px', padding: '0', lineHeight: 1 }}
+                        onClick={() => setEditingChapter({ ...editingChapter, foreshadowsAdded: editingChapter.foreshadowsAdded.filter((x) => x !== id) })}>✕</button>
+                    </span>
                   ))}
                 </div>
               </div>
               <div className="form-group">
                 <label>回收伏笔</label>
-                <div style={{ maxHeight: '100px', overflow: 'auto' }}>
-                  {foreshadows.map((f) => (
-                    <label key={f.id} style={{ fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <input type="checkbox" checked={editingChapter.foreshadowsResolved.includes(f.id)}
-                        onChange={() => {
-                          setEditingChapter({
-                            ...editingChapter,
-                            foreshadowsResolved: editingChapter.foreshadowsResolved.includes(f.id)
-                              ? editingChapter.foreshadowsResolved.filter((x) => x !== f.id)
-                              : [...editingChapter.foreshadowsResolved, f.id],
-                          });
-                        }} />
-                      {f.content.slice(0, 30)}...
-                    </label>
+                <button className="btn btn-sm" style={{ width: '100%' }}
+                  onClick={(e) => { e.preventDefault(); setPickerOpen('foresResolved'); setPickerSearch(''); }}>
+                  ✅ 选择伏笔 ({editingChapter.foreshadowsResolved.filter((id) => validForeshadowIds.has(id)).length})
+                </button>
+                <div className={styles.tagList} style={{ marginTop: '6px' }}>
+                  {editingChapter.foreshadowsResolved.filter((id) => validForeshadowIds.has(id)).map((id) => (
+                    <span key={id} className={styles.relatedTag} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(90, 158, 111, 0.15)', color: 'var(--success)' }}>
+                      {getForeshadowContent(id)}
+                      <button style={{ cursor: 'pointer', border: 'none', background: 'none', color: 'var(--text-muted)', fontSize: '12px', padding: '0', lineHeight: 1 }}
+                        onClick={() => setEditingChapter({ ...editingChapter, foreshadowsResolved: editingChapter.foreshadowsResolved.filter((x) => x !== id) })}>✕</button>
+                    </span>
                   ))}
                 </div>
               </div>
@@ -397,22 +410,54 @@ export default function ChaptersPage() {
                 <section className={styles.section}>
                   <h3>出场角色</h3>
                   <div className={styles.tagList}>
-                    {selectedChapter.characters.map((id) => (
-                      <span key={id} className={styles.relatedTag}>{getCharName(id)}</span>
-                    ))}
+                    {selectedChapter.characters.map((id) => {
+                      const name = getCharName(id);
+                      return (
+                        <span key={id} className={styles.relatedTag} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          {name || '未知'}
+                          <button
+                            style={{ cursor: 'pointer', border: 'none', background: 'none', color: 'var(--text-muted)', fontSize: '12px', padding: '0', lineHeight: 1 }}
+                            title="移除此角色"
+                            onClick={async () => {
+                              const updated = { ...selectedChapter, characters: selectedChapter.characters.filter((x) => x !== id) };
+                              await updateChapter(updated);
+                              await loadChapters(currentProject!.id);
+                            }}
+                          >✕</button>
+                        </span>
+                      );
+                    })}
                   </div>
                 </section>
+              )}
+              {selectedChapter.characters.some((id) => !validCharIds.has(id)) && (
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', cursor: 'pointer' }}
+                  onClick={() => cleanInvalidRefs(selectedChapter).then(() => loadChapters(currentProject!.id))}>
+                  ⚠️ 存在无效引用，点击清理
+                </div>
               )}
 
               {selectedChapter.foreshadowsAdded.length > 0 && (
                 <section className={styles.section}>
                   <h3>新增伏笔</h3>
                   <div className={styles.tagList}>
-                    {selectedChapter.foreshadowsAdded.map((id) => (
-                      <span key={id} className={styles.relatedTag} style={{ background: 'rgba(201, 158, 75, 0.15)', color: 'var(--warning)' }}>
-                        {getForeshadowContent(id)}
-                      </span>
-                    ))}
+                    {selectedChapter.foreshadowsAdded.map((id) => {
+                      const content = getForeshadowContent(id);
+                      return (
+                        <span key={id} className={styles.relatedTag} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(201, 158, 75, 0.15)', color: 'var(--warning)' }}>
+                          {content || '未知伏笔'}
+                          <button
+                            style={{ cursor: 'pointer', border: 'none', background: 'none', color: 'var(--text-muted)', fontSize: '12px', padding: '0', lineHeight: 1 }}
+                            title="移除此伏笔"
+                            onClick={async () => {
+                              const updated = { ...selectedChapter, foreshadowsAdded: selectedChapter.foreshadowsAdded.filter((x) => x !== id) };
+                              await updateChapter(updated);
+                              await loadChapters(currentProject!.id);
+                            }}
+                          >✕</button>
+                        </span>
+                      );
+                    })}
                   </div>
                 </section>
               )}
@@ -421,11 +466,23 @@ export default function ChaptersPage() {
                 <section className={styles.section}>
                   <h3>回收伏笔</h3>
                   <div className={styles.tagList}>
-                    {selectedChapter.foreshadowsResolved.map((id) => (
-                      <span key={id} className={styles.relatedTag} style={{ background: 'rgba(90, 158, 111, 0.15)', color: 'var(--success)' }}>
-                        {getForeshadowContent(id)}
-                      </span>
-                    ))}
+                    {selectedChapter.foreshadowsResolved.map((id) => {
+                      const content = getForeshadowContent(id);
+                      return (
+                        <span key={id} className={styles.relatedTag} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(90, 158, 111, 0.15)', color: 'var(--success)' }}>
+                          {content || '未知伏笔'}
+                          <button
+                            style={{ cursor: 'pointer', border: 'none', background: 'none', color: 'var(--text-muted)', fontSize: '12px', padding: '0', lineHeight: 1 }}
+                            title="移除此伏笔"
+                            onClick={async () => {
+                              const updated = { ...selectedChapter, foreshadowsResolved: selectedChapter.foreshadowsResolved.filter((x) => x !== id) };
+                              await updateChapter(updated);
+                              await loadChapters(currentProject!.id);
+                            }}
+                          >✕</button>
+                        </span>
+                      );
+                    })}
                   </div>
                 </section>
               )}
@@ -486,26 +543,33 @@ export default function ChaptersPage() {
             </div>
             <div className="form-group">
               <label>出场角色</label>
-              <div style={{ maxHeight: '120px', overflow: 'auto', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                {characters.map((c) => (
-                  <label key={c.id} style={{ fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <input type="checkbox" checked={formCharacters.includes(c.id)}
-                      onChange={() => toggleSelect(c.id, formCharacters, setFormCharacters)} />
-                    {c.name}
-                  </label>
+              <button className="btn btn-sm" style={{ width: '100%' }}
+                onClick={(e) => { e.preventDefault(); setPickerOpen('chars'); setPickerSearch(''); }}>
+                👤 选择角色 ({formCharacters.filter((id) => validCharIds.has(id)).length})
+              </button>
+              <div className={styles.tagList} style={{ marginTop: '6px' }}>
+                {formCharacters.filter((id) => validCharIds.has(id)).map((id) => (
+                  <span key={id} className={styles.relatedTag} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    {getCharName(id)}
+                    <button style={{ cursor: 'pointer', border: 'none', background: 'none', color: 'var(--text-muted)', fontSize: '12px', padding: '0', lineHeight: 1 }}
+                      onClick={() => setFormCharacters(formCharacters.filter((x) => x !== id))}>✕</button>
+                  </span>
                 ))}
-                {characters.length === 0 && <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>暂无角色</span>}
               </div>
             </div>
             <div className="form-group">
               <label>新增伏笔</label>
-              <div style={{ maxHeight: '100px', overflow: 'auto' }}>
-                {foreshadows.map((f) => (
-                  <label key={f.id} style={{ fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <input type="checkbox" checked={formForeshadowsAdded.includes(f.id)}
-                      onChange={() => toggleSelect(f.id, formForeshadowsAdded, setFormForeshadowsAdded)} />
-                    {f.content.slice(0, 30)}...
-                  </label>
+              <button className="btn btn-sm" style={{ width: '100%' }}
+                onClick={(e) => { e.preventDefault(); setPickerOpen('foresAdded'); setPickerSearch(''); }}>
+                🔮 选择伏笔 ({formForeshadowsAdded.filter((id) => validForeshadowIds.has(id)).length})
+              </button>
+              <div className={styles.tagList} style={{ marginTop: '6px' }}>
+                {formForeshadowsAdded.filter((id) => validForeshadowIds.has(id)).map((id) => (
+                  <span key={id} className={styles.relatedTag} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(201, 158, 75, 0.15)', color: 'var(--warning)' }}>
+                    {getForeshadowContent(id)}
+                    <button style={{ cursor: 'pointer', border: 'none', background: 'none', color: 'var(--text-muted)', fontSize: '12px', padding: '0', lineHeight: 1 }}
+                      onClick={() => setFormForeshadowsAdded(formForeshadowsAdded.filter((x) => x !== id))}>✕</button>
+                  </span>
                 ))}
               </div>
             </div>
@@ -546,6 +610,124 @@ export default function ChaptersPage() {
                 实时字数：{draftWordCount.toLocaleString()} 字
               </span>
               <button className="btn btn-primary" onClick={saveDraft}>💾 保存草稿</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 选择器弹窗（角色/伏笔） */}
+      {pickerOpen && (
+        <div className="modal-overlay" onClick={() => setPickerOpen(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ minWidth: '450px', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
+            <h2>
+              {pickerOpen === 'chars' ? '👤 选择出场角色' :
+               pickerOpen === 'foresAdded' ? '🔮 选择新增伏笔' : '✅ 选择回收伏笔'}
+            </h2>
+            <input
+              className="input"
+              value={pickerSearch}
+              onChange={(e) => setPickerSearch(e.target.value)}
+              placeholder="🔍 搜索..."
+              style={{ marginBottom: '12px' }}
+              autoFocus
+            />
+            <div style={{ flex: 1, overflowY: 'auto', maxHeight: '350px' }}>
+              {pickerOpen === 'chars' && characters
+                .filter((c) => !pickerSearch || c.name.includes(pickerSearch) || (c.description || '').includes(pickerSearch))
+                .map((c) => (
+                  <label key={c.id} style={{
+                    display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px',
+                    cursor: 'pointer', borderRadius: 'var(--radius-sm)', marginBottom: '2px',
+                    background: (editingChapter?.characters.includes(c.id) || formCharacters.includes(c.id)) ? 'rgba(201,169,110,0.08)' : 'transparent',
+                  }}>
+                    <input type="checkbox"
+                      checked={editingChapter?.characters.includes(c.id) || formCharacters.includes(c.id)}
+                      onChange={() => {
+                        if (editingChapter) {
+                          setEditingChapter({ ...editingChapter, characters: editingChapter.characters.includes(c.id) ? editingChapter.characters.filter((x) => x !== c.id) : [...editingChapter.characters, c.id] });
+                        } else {
+                          setFormCharacters(formCharacters.includes(c.id) ? formCharacters.filter((x) => x !== c.id) : [...formCharacters, c.id]);
+                        }
+                      }} />
+                    <span style={{ fontWeight: 500 }}>{c.name}</span>
+                    {c.race && <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{c.race}</span>}
+                  </label>
+                ))}
+              {pickerOpen === 'foresAdded' && foreshadows
+                .filter((f) => !pickerSearch || f.content.includes(pickerSearch))
+                .map((f) => (
+                  <label key={f.id} style={{
+                    display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px',
+                    cursor: 'pointer', borderRadius: 'var(--radius-sm)', marginBottom: '2px',
+                    background: (editingChapter?.foreshadowsAdded.includes(f.id) || formForeshadowsAdded.includes(f.id)) ? 'rgba(201,169,110,0.08)' : 'transparent',
+                  }}>
+                    <input type="checkbox"
+                      checked={editingChapter?.foreshadowsAdded.includes(f.id) || formForeshadowsAdded.includes(f.id)}
+                      onChange={() => {
+                        if (editingChapter) {
+                          setEditingChapter({ ...editingChapter, foreshadowsAdded: editingChapter.foreshadowsAdded.includes(f.id) ? editingChapter.foreshadowsAdded.filter((x) => x !== f.id) : [...editingChapter.foreshadowsAdded, f.id] });
+                        } else {
+                          setFormForeshadowsAdded(formForeshadowsAdded.includes(f.id) ? formForeshadowsAdded.filter((x) => x !== f.id) : [...formForeshadowsAdded, f.id]);
+                        }
+                      }} />
+                    <span style={{ flex: 1 }}>{f.content}</span>
+                    <span className={`tag tag-${f.status}`} style={{ fontSize: '10px' }}>{f.status === 'pending' ? '未触发' : f.status === 'active' ? '进行中' : f.status === 'resolved' ? '已回收' : '已放弃'}</span>
+                  </label>
+                ))}
+              {pickerOpen === 'foresResolved' && foreshadows
+                .filter((f) => !pickerSearch || f.content.includes(pickerSearch))
+                .map((f) => (
+                  <label key={f.id} style={{
+                    display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px',
+                    cursor: 'pointer', borderRadius: 'var(--radius-sm)', marginBottom: '2px',
+                    background: (editingChapter?.foreshadowsResolved.includes(f.id) || formForeshadowsResolved.includes(f.id)) ? 'rgba(201,169,110,0.08)' : 'transparent',
+                  }}>
+                    <input type="checkbox"
+                      checked={editingChapter?.foreshadowsResolved.includes(f.id) || formForeshadowsResolved.includes(f.id)}
+                      onChange={() => {
+                        if (editingChapter) {
+                          setEditingChapter({ ...editingChapter, foreshadowsResolved: editingChapter.foreshadowsResolved.includes(f.id) ? editingChapter.foreshadowsResolved.filter((x) => x !== f.id) : [...editingChapter.foreshadowsResolved, f.id] });
+                        } else {
+                          setFormForeshadowsResolved(formForeshadowsResolved.includes(f.id) ? formForeshadowsResolved.filter((x) => x !== f.id) : [...formForeshadowsResolved, f.id]);
+                        }
+                      }} />
+                    <span style={{ flex: 1 }}>{f.content}</span>
+                    <span className={`tag tag-${f.status}`} style={{ fontSize: '10px' }}>{f.status === 'pending' ? '未触发' : f.status === 'active' ? '进行中' : f.status === 'resolved' ? '已回收' : '已放弃'}</span>
+                  </label>
+                ))}
+            </div>
+            <div className="form-actions">
+              <button className="btn btn-sm" onClick={() => {
+                const target = editingChapter ? editingChapter : null;
+                if (pickerOpen === 'chars') {
+                  const all = characters.map((c) => c.id);
+                  if (target) setEditingChapter({ ...target, characters: all });
+                  else setFormCharacters(all);
+                } else if (pickerOpen === 'foresAdded') {
+                  const all = foreshadows.map((f) => f.id);
+                  if (target) setEditingChapter({ ...target, foreshadowsAdded: all });
+                  else setFormForeshadowsAdded(all);
+                } else {
+                  const all = foreshadows.map((f) => f.id);
+                  if (target) setEditingChapter({ ...target, foreshadowsResolved: all });
+                  else setFormForeshadowsResolved(all);
+                }
+              }}>全选</button>
+              <button className="btn btn-sm" onClick={() => {
+                const target = editingChapter ? editingChapter : null;
+                if (pickerOpen === 'chars') {
+                  if (target) setEditingChapter({ ...target, characters: [] });
+                  else setFormCharacters([]);
+                } else if (pickerOpen === 'foresAdded') {
+                  if (target) setEditingChapter({ ...target, foreshadowsAdded: [] });
+                  else setFormForeshadowsAdded([]);
+                } else {
+                  if (target) setEditingChapter({ ...target, foreshadowsResolved: [] });
+                  else setFormForeshadowsResolved([]);
+                }
+              }}>清空</button>
+              <div style={{ flex: 1 }} />
+              <button className="btn btn-primary" onClick={() => setPickerOpen(null)}>确定</button>
             </div>
           </div>
         </div>

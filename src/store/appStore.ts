@@ -18,6 +18,7 @@ interface AppState {
   // 主题
   theme: 'dark' | 'light';
   toggleTheme: () => void;
+  setTheme: (theme: 'dark' | 'light') => void;
 
   // 刷新触发器（用于各模块手动刷新数据）
   refreshKey: number;
@@ -33,6 +34,7 @@ export const useAppStore = create<AppState>((set) => ({
 
   theme: 'dark',
   toggleTheme: () => set((s) => ({ theme: s.theme === 'dark' ? 'light' : 'dark' })),
+  setTheme: (theme) => set({ theme }),
 
   refreshKey: 0,
   triggerRefresh: () => set((s) => ({ refreshKey: s.refreshKey + 1 })),

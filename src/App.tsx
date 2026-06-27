@@ -3,7 +3,8 @@
  * 配置路由：Dashboard、项目管理、角色、章节、伏笔、世界观、资源
  */
 
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect, useRef } from 'react';
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import DashboardPage from './pages/Dashboard';
 import ProjectsPage from './pages/Projects';
@@ -17,41 +18,115 @@ import TemplatesPage from './pages/Templates';
 import AIAssistantPage from './pages/AIAssistant';
 import OutlinePage from './pages/Outline';
 import TagsPage from './pages/Tags';
+import { electronBridge } from './utils/electronBridge';
+import { useAppStore } from './store/appStore';
+import { db } from './db/database';
 import './styles/global.css';
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <HashRouter>
       <Routes>
         <Route path="/" element={<Layout />}>
-          {/* 默认跳转到项目列表 */}
           <Route index element={<Navigate to="/projects" replace />} />
-          {/* 作品 Dashboard */}
           <Route path="dashboard" element={<DashboardPage />} />
-          {/* 项目管理 */}
           <Route path="projects" element={<ProjectsPage />} />
-          {/* 角色管理 */}
           <Route path="characters" element={<CharactersPage />} />
-          {/* 章节管理 */}
           <Route path="chapters" element={<ChaptersPage />} />
-          {/* 章节时间线 */}
           <Route path="timeline" element={<TimelinePage />} />
-          {/* 伏笔追踪 */}
           <Route path="foreshadows" element={<ForeshadowsPage />} />
-          {/* 世界观设定 */}
           <Route path="worldsettings" element={<WorldSettingsPage />} />
-          {/* 资源追踪 */}
           <Route path="resources" element={<ResourcesPage />} />
-          {/* 模板与导入导出 */}
           <Route path="templates" element={<TemplatesPage />} />
-          {/* AI 写作助手 */}
           <Route path="ai" element={<AIAssistantPage />} />
-          {/* 大纲编辑器 */}
           <Route path="outline" element={<OutlinePage />} />
-          {/* 标签管理 */}
           <Route path="tags" element={<TagsPage />} />
         </Route>
       </Routes>
-    </BrowserRouter>
+      <ElectronIntegration />
+    </HashRouter>
   );
+}
+
+/** Electron 桌面环境集成组件（浏览器中无操作） */
+function ElectronIntegration() {
+  const cleanupRef = useRef<(() => void)[]>([]);
+
+  useEffect(() => {
+    if (!electronBridge.isElectron) return;
+
+    // 1. 自动保存：监听主进程的保存请求
+    const unsubAutosave = electronBridge.onAutosaveRequest(async () => {
+      try {
+        const state = useAppStore.getState();
+        if (!state.currentProject) return;
+        const characters = await db.characters.getByProject(state.currentProject.id);
+        const chapters = await db.chapters.getByProject(state.currentProject.id);
+        const foreshadows = await db.foreshadows.getByProject(state.currentProject.id);
+        const worldSettings = await db.worldSettings.getByProject(state.currentProject.id);
+        const data = JSON.stringify({
+          project: state.currentProject,
+          characters,
+          chapters,
+          foreshadows,
+          worldSettings,
+          savedAt: new Date().toISOString(),
+        });
+        electronBridge.sendAutosave(data);
+      } catch (err) {
+        console.error('[AutoSave] 收集数据失败:', err);
+      }
+    });
+    cleanupRef.current.push(unsubAutosave);
+
+    // 2. 崩溃恢复：检查上次是否有未保存的数据
+    const unsubCrash = electronBridge.onCrashRecovery(async (recovery) => {
+      if (recovery.available && recovery.data) {
+        console.log('[Recovery] 发现崩溃前的自动保存数据');
+        const shouldRestore = window.confirm(
+          '检测到上次异常退出前的自动保存数据，是否恢复？\n\n（选择"取消"将忽略自动保存）'
+        );
+        if (shouldRestore) {
+          try {
+            const parsed = JSON.parse(recovery.data);
+            console.log('[Recovery] 恢复数据:', parsed.savedAt);
+            if (parsed.project) {
+              const appStore = useAppStore.getState();
+              if (parsed.characters?.length) await db.characters.addMany(parsed.characters);
+              if (parsed.chapters?.length) await db.chapters.addMany(parsed.chapters);
+              if (parsed.foreshadows?.length) await db.foreshadows.addMany(parsed.foreshadows);
+              if (parsed.worldSettings?.length) await db.worldSettings.addMany(parsed.worldSettings);
+              appStore.triggerRefresh();
+              alert('数据已从自动保存恢复！');
+            }
+          } catch {
+            console.error('[Recovery] 解析恢复数据失败');
+          }
+        }
+      }
+    });
+    cleanupRef.current.push(unsubCrash);
+
+    // 3. 原生主题同步
+    electronBridge.getNativeTheme().then((nativeTheme) => {
+      if (nativeTheme === 'dark' || nativeTheme === 'light') {
+        const appStore = useAppStore.getState();
+        if (appStore.theme !== nativeTheme) {
+          appStore.setTheme(nativeTheme);
+        }
+      }
+    });
+
+    const unsubTheme = electronBridge.onThemeChanged((theme) => {
+      const appStore = useAppStore.getState();
+      appStore.setTheme(theme as 'light' | 'dark');
+    });
+    cleanupRef.current.push(unsubTheme);
+
+    return () => {
+      cleanupRef.current.forEach((fn) => fn());
+    };
+  }, []);
+
+  return null;
 }

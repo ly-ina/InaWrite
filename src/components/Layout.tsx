@@ -3,10 +3,13 @@
  * 左侧导航栏（根据是否在项目内切换菜单） + 顶部面包屑 + 主内容区
  */
 
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAppStore } from '../store/appStore';
+import { useProjectStore } from '../store/projectStore';
 import { useT } from '../i18n';
+import { exportProject, readJSONFile, executeImport } from '../utils/importExport';
+import { db } from '../db/database';
 import GlobalSearch from './GlobalSearch';
 import ShortcutPanel from './ShortcutPanel';
 import styles from './Layout.module.css';
@@ -48,10 +51,13 @@ const BREADCRUMB_MAP: Record<string, string> = {
 };
 
 export default function Layout() {
-  const { currentProject, theme, toggleTheme, sidebarCollapsed, toggleSidebar, setCurrentProject } = useAppStore();
+  const { currentProject, theme, toggleTheme, sidebarCollapsed, toggleSidebar, setCurrentProject, triggerRefresh } = useAppStore();
+  const { loadProjects } = useProjectStore();
   const { t, lang, setLang } = useT();
   const navigate = useNavigate();
   const location = useLocation();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [importMsg, setImportMsg] = useState('');
 
   // 判断当前是否在项目内（有选中项目 + 不在作品列表页）
   const isInProject = currentProject !== null && location.pathname !== '/projects';
@@ -75,6 +81,65 @@ export default function Layout() {
   const handleBackToProjects = () => {
     setCurrentProject(null);
     navigate('/projects');
+  };
+
+  /** 导出当前作品 */
+  const handleExportCurrent = async () => {
+    if (!currentProject) return;
+    try {
+      const json = await exportProject(currentProject);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${currentProject.name}-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('导出失败:', err);
+      alert('导出失败');
+    }
+  };
+
+  /** 导入作品文件 */
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImportMsg('');
+    try {
+      const data = await readJSONFile(file);
+      if (!data) { setImportMsg('文件格式无效'); return; }
+      // 如果是完整导出且有 project 信息
+      if (data.project) {
+        // 先创建/更新项目
+        const existingProject = (await db.projects.getAll())
+          .find((p) => p.name === data.project.name);
+        let projectId: string;
+        if (existingProject) {
+          projectId = existingProject.id;
+        } else {
+          const newProject = { ...data.project, id: crypto.randomUUID() };
+          await db.projects.add(newProject);
+          projectId = newProject.id;
+        }
+        await executeImport(projectId, data, false);
+        setImportMsg(`✅ 导入成功：${data.project.name}`);
+        // 刷新项目列表，并自动切换到导入的项目
+        await loadProjects();
+        const updated = (await db.projects.getAll()).find((p) => p.id === projectId);
+        if (updated) {
+          setCurrentProject(updated);
+          navigate('/dashboard');
+        }
+        triggerRefresh();
+      } else {
+        setImportMsg('文件格式不支持（需要完整导出格式）');
+      }
+    } catch (err) {
+      setImportMsg('导入失败：' + (err instanceof Error ? err.message : '未知错误'));
+    }
+    // 重置 input 以允许重复导入同一文件
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   // 同步 body class 以支持全局背景和组件外元素
@@ -134,6 +199,28 @@ export default function Layout() {
         <div className={styles.sidebarFooter}>
           {!sidebarCollapsed && (
             <>
+              {/* 导入导出 */}
+              {currentProject && (
+                <>
+                  <button className={styles.themeToggle} onClick={handleExportCurrent} title="导出当前作品">
+                    📤 导出作品
+                  </button>
+                </>
+              )}
+              <button className={styles.themeToggle} onClick={() => fileInputRef.current?.click()} title="导入作品文件">
+                📥 导入作品
+              </button>
+              <input ref={fileInputRef} type="file" accept=".json" style={{ display: 'none' }}
+                onChange={handleImportFile} />
+              {importMsg && (
+                <div style={{
+                  fontSize: '11px', color: importMsg.startsWith('✅') ? 'var(--accent)' : 'var(--danger)',
+                  marginTop: '4px', textAlign: 'center', wordBreak: 'break-all'
+                }}>
+                  {importMsg}
+                </div>
+              )}
+              <div style={{ margin: '4px 0', borderTop: '1px solid var(--border-color)' }} />
               <button className={styles.themeToggle} onClick={toggleTheme}>
                 {theme === 'dark' ? t('nav.themeLight') : t('nav.themeDark')}
               </button>

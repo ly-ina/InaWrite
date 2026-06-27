@@ -190,6 +190,11 @@ export default function OutlinePage() {
     setEditWorldIntro([]);
   };
 
+  // 过滤无效引用
+  const validCharIds = new Set(characters.map((c) => c.id));
+  const validForeshadowIds = new Set(foreshadows.map((f) => f.id));
+  const validSettingIds = new Set(settings.map((s) => s.id));
+
   const startEdit = (node: OutlineNode) => {
     setAddingParentId(null);
     setEditingId(node.id);
@@ -200,10 +205,11 @@ export default function OutlinePage() {
     setEditColor(node.color || '');
     setEditEstWords(node.estimatedWords || 0);
     setEditChapterId(node.chapterId || '');
-    setEditChars(node.characters);
-    setEditForesPlanted(node.foreshadowsPlanted);
-    setEditForesResolved(node.foreshadowsResolved);
-    setEditWorldIntro(node.worldSettingsIntroduced);
+    // 过滤无效引用，只保留有效 ID
+    setEditChars((node.characters || []).filter((id) => validCharIds.has(id)));
+    setEditForesPlanted((node.foreshadowsPlanted || []).filter((id) => validForeshadowIds.has(id)));
+    setEditForesResolved((node.foreshadowsResolved || []).filter((id) => validForeshadowIds.has(id)));
+    setEditWorldIntro((node.worldSettingsIntroduced || []).filter((id) => validSettingIds.has(id)));
   };
 
   const cancelEdit = () => {

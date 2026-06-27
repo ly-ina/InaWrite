@@ -1,20 +1,40 @@
 {
   "name": "novel-inakb",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "description": "Novel InaKB — 小说·伊纳知识库，本地优先的小说创作与世界观管理工具",
+  "author": "ly-ina",
+  "license": "MIT",
   "type": "module",
+  "main": "dist-electron/main.cjs",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "postinstall": "node scripts/setup-electron.cjs",
+    "electron:install": "cross-env ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ npm install electron@36.2.1 electron-builder@26.0.12 --save-dev",
+    "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && tsc -p electron/tsconfig.json && electron .\"",
+    "electron:build": "tsc && vite build && tsc -p electron/tsconfig.json && electron-builder",
+    "electron:build:win": "tsc && vite build && tsc -p electron/tsconfig.json && electron-builder --win",
+    "electron:build:mac": "tsc && vite build && tsc -p electron/tsconfig.json && electron-builder --mac",
+    "electron:build:linux": "tsc && vite build && tsc -p electron/tsconfig.json && electron-builder --linux",
+    "electron:build:all": "tsc && vite build && tsc -p electron/tsconfig.json && electron-builder --win --mac --linux"
   },
   "devDependencies": {
     "@types/file-saver": "^2.0.7",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.3",
+    "concurrently": "^9.2.1",
+    "electron": "^36.2.1",
+    "electron-builder": "^26.0.12",
     "typescript": "~6.0.2",
-    "vite": "^8.1.0"
+    "vite": "^8.1.0",
+    "wait-on": "^8.0.4"
+  },
+  "electronDependencies": {
+    "electron": "^36.2.1",
+    "electron-builder": "^26.0.12"
   },
   "dependencies": {
     "@types/d3": "^7.4.3",
