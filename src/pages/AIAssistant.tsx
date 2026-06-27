@@ -21,7 +21,7 @@ import styles from './AIAssistant.module.css';
 type TabKey = 'analyze' | 'suggest' | 'resources' | 'settings';
 
 export default function AIAssistantPage() {
-  const { currentProject, refreshKey, setRefreshKey } = useAppStore();
+  const { currentProject, refreshKey, triggerRefresh } = useAppStore();
   const { characters, loadCharacters } = useCharacterStore();
   const { settings, loadSettings } = useWorldSettingStore();
   const { foreshadows, loadForeshadows } = useForeshadowStore();
@@ -103,7 +103,7 @@ export default function AIAssistantPage() {
     try {
       const stats = await applyAnalysisResult(currentProject.id, analysisResult);
       setApplyStats(stats);
-      setRefreshKey(Date.now());
+      triggerRefresh();
       // 重新加载数据
       await loadCharacters(currentProject.id);
       await loadSettings(currentProject.id);
@@ -179,7 +179,7 @@ export default function AIAssistantPage() {
     try {
       const count = await applyResourceUpdates(currentProject.id, resourceUpdates);
       setResourceUpdates([]);
-      setRefreshKey(Date.now());
+      triggerRefresh();
       await loadCharacters(currentProject.id);
       alert(`已更新 ${count} 项资源状态`);
     } catch (err) {
