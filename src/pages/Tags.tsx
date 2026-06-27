@@ -11,6 +11,7 @@ import { useForeshadowStore } from '../store/foreshadowStore';
 import { useWorldSettingStore } from '../store/worldSettingStore';
 import { db } from '../db/database';
 import { generateId, type Tag, type TagAssignment } from '../types';
+import { generateTags } from '../utils/aiService';
 import styles from './Tags.module.css';
 
 /** 颜色预设 */
@@ -41,6 +42,45 @@ export default function TagsPage() {
 
   // 标签云视图
   const [selectedTagId, setSelectedTagId] = useState<string | null>(null);
+  // AI 生成
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiGeneratedTags, setAiGeneratedTags] = useState<{ name: string; color: string; description: string }[]>([]);
+  const [aiTagError, setAiTagError] = useState('');
+
+  const handleAIGenerateTags = async () => {
+    if (!currentProject) return;
+    setAiGenerating(true);
+    setAiTagError('');
+    setAiGeneratedTags([]);
+    try {
+      const generated = await generateTags({
+        characters: characters.map((c) => ({ name: c.name, description: c.description })),
+        chapters: chapters.map((ch) => ({ title: ch.title, summary: ch.summary })),
+        settings: settings.map((s) => ({ name: s.name, description: s.description })),
+        foreshadows: foreshadows.map((f) => ({ content: f.content })),
+      });
+      setAiGeneratedTags(generated);
+    } catch (err) {
+      setAiTagError(err instanceof Error ? err.message : 'AI 生成失败');
+    } finally {
+      setAiGenerating(false);
+    }
+  };
+
+  /** 一键添加 AI 生成的标签 */
+  const handleAddGeneratedTag = async (tagData: { name: string; color: string; description: string }) => {
+    if (!currentProject) return;
+    const exists = tags.some((t) => t.name === tagData.name);
+    if (exists) { alert(`标签「${tagData.name}」已存在`); return; }
+    await db.tags.add({
+      id: generateId(), projectId: currentProject.id,
+      name: tagData.name, color: tagData.color, description: tagData.description,
+      createdAt: new Date().toISOString(),
+    });
+    await loadTags();
+    // 从列表中移除
+    setAiGeneratedTags((prev) => prev.filter((t) => t.name !== tagData.name));
+  };
 
   useEffect(() => {
     if (currentProject) {
@@ -157,6 +197,9 @@ export default function TagsPage() {
       <div className="page-header">
         <h1>🏷 标签管理</h1>
         <div className="actions">
+          <button className="btn btn-sm" onClick={handleAIGenerateTags} disabled={aiGenerating}>
+            {aiGenerating ? '⏳ AI 生成中...' : '🤖 AI 生成标签'}
+          </button>
           <button className="btn btn-sm" onClick={() => { setShowAssigner(!showAssigner); }}>
             {showAssigner ? '关闭分配' : '🏷 批量打标签'}
           </button>
@@ -196,6 +239,35 @@ export default function TagsPage() {
                 ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* AI 生成的标签 */}
+      {aiGeneratedTags.length > 0 && (
+        <div style={{ padding: '14px', background: 'var(--bg-card)', border: '1px solid var(--accent)', borderRadius: 'var(--radius-md)', marginBottom: '14px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+            <h3 style={{ margin: 0, fontFamily: 'var(--font-serif)', fontSize: '15px' }}>🤖 AI 建议标签</h3>
+            <button className="btn btn-sm btn-ghost" onClick={() => setAiGeneratedTags([])}>关闭</button>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+            {aiGeneratedTags.map((tag, i) => (
+              <div key={i} style={{
+                padding: '8px 14px', background: 'var(--bg-secondary)', border: `1px solid ${tag.color}`,
+                borderRadius: 'var(--radius-sm)', cursor: 'pointer', transition: 'all 0.12s',
+              }} onClick={() => handleAddGeneratedTag(tag)} title={`点击添加：${tag.description}`}>
+                <div style={{ fontWeight: 600, color: tag.color, fontSize: '14px' }}>{tag.name}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>{tag.description}</div>
+                <div style={{ fontSize: '10px', color: 'var(--accent)', marginTop: '4px' }}>点击添加 →</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* AI 错误 */}
+      {aiTagError && (
+        <div style={{ padding: '8px 12px', background: 'rgba(196,75,75,0.1)', border: '1px solid var(--danger)', borderRadius: 'var(--radius-sm)', color: 'var(--danger)', fontSize: '13px', marginBottom: '12px' }}>
+          ⚠️ {aiTagError} <button className="btn btn-sm btn-ghost" onClick={() => setAiTagError('')}>✕</button>
         </div>
       )}
 

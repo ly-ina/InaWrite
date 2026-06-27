@@ -11,6 +11,7 @@ import { useForeshadowStore } from '../store/foreshadowStore';
 import { useWorldSettingStore } from '../store/worldSettingStore';
 import { useChapterStore } from '../store/chapterStore';
 import { generateId, type OutlineNode, type OutlineNodeType } from '../types';
+import { optimizeOutline, type OutlineNodeInfo, type OutlineOptimizeResult } from '../utils/aiService';
 import styles from './Outline.module.css';
 
 /** 节点类型配置 */
@@ -69,6 +70,40 @@ export default function OutlinePage() {
 
   // 是否自动展开全部
   const [autoExpand, setAutoExpand] = useState(true);
+
+  // AI 优化
+  const [aiOptimizing, setAiOptimizing] = useState(false);
+  const [optimizeResult, setOptimizeResult] = useState<OutlineOptimizeResult | null>(null);
+  const [aiError, setAiError] = useState('');
+
+  /** AI 优化大纲 */
+  const handleAIOptimize = async () => {
+    setAiOptimizing(true);
+    setAiError('');
+    setOptimizeResult(null);
+    try {
+      // 构建节点树
+      const buildTree = (parentId: string | null): OutlineNodeInfo[] => {
+        return getChildren(parentId).map((n) => ({
+          title: n.title,
+          type: n.type,
+          notes: n.notes,
+          children: buildTree(n.id),
+        }));
+      };
+      const tree = buildTree(null);
+      const result = await optimizeOutline({
+        nodes: tree,
+        characters: characters.map((c) => ({ name: c.name, description: c.description })),
+        totalChapters: chapters.length,
+      });
+      setOptimizeResult(result);
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : 'AI 优化失败');
+    } finally {
+      setAiOptimizing(false);
+    }
+  };
 
   useEffect(() => {
     if (currentProject) {
@@ -611,6 +646,9 @@ export default function OutlinePage() {
         <h1>📋 大纲编辑器</h1>
         <div className="actions">
           <button className="btn btn-sm" onClick={() => setShowChapterPicker(true)}>📖 从章节生成</button>
+          <button className="btn btn-sm" onClick={handleAIOptimize} disabled={aiOptimizing || nodes.length === 0}>
+            {aiOptimizing ? '⏳ AI 优化中...' : '🤖 AI 优化大纲'}
+          </button>
           <button className="btn btn-sm" onClick={autoExpand ? collapseAll : expandAll}>
             {autoExpand ? '📁 全部折叠' : '📂 全部展开'}
           </button>
@@ -629,6 +667,41 @@ export default function OutlinePage() {
         ))}
         <span className={styles.nodeCount}>{visibleNodes.length} 个节点</span>
       </div>
+
+      {/* AI 优化错误 */}
+      {aiError && (
+        <div style={{ padding: '8px 12px', background: 'rgba(196,75,75,0.1)', border: '1px solid var(--danger)', borderRadius: 'var(--radius-sm)', color: 'var(--danger)', fontSize: '13px', marginBottom: '12px' }}>
+          ⚠️ {aiError} <button className="btn btn-sm btn-ghost" onClick={() => setAiError('')} style={{ marginLeft: '8px' }}>✕</button>
+        </div>
+      )}
+
+      {/* AI 优化结果 */}
+      {optimizeResult && (
+        <div style={{ padding: '14px', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', marginBottom: '14px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+            <h3 style={{ margin: 0, fontFamily: 'var(--font-serif)', fontSize: '15px' }}>🤖 AI 优化建议</h3>
+            <button className="btn btn-sm btn-ghost" onClick={() => setOptimizeResult(null)}>关闭</button>
+          </div>
+          {optimizeResult.suggestions.length > 0 && (
+            <div style={{ marginBottom: '10px' }}>
+              {optimizeResult.suggestions.map((s, i) => (
+                <div key={i} style={{ fontSize: '13px', color: 'var(--text-secondary)', padding: '4px 0', lineHeight: '1.6' }}>
+                  💡 {s}
+                </div>
+              ))}
+            </div>
+          )}
+          {optimizeResult.optimizedOutline && (
+            <div>
+              <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent)', marginBottom: '6px' }}>优化后大纲预览</div>
+              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.8', whiteSpace: 'pre-wrap',
+                maxHeight: '400px', overflowY: 'auto', padding: '10px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)' }}>
+                {optimizeResult.optimizedOutline.slice(0, 3000)}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 主内容区：大纲列表 + 编辑/详情侧边栏 */}
       <div className={styles.mainArea}>

@@ -100,6 +100,7 @@ export interface ExtractedCharacter {
   description?: string;
   status?: 'alive' | 'dead' | 'unknown' | 'mentioned';
   currentLocation?: string;
+  arc?: string;
   resources?: { name: string; type: string; description: string; status: string }[];
   relations?: { targetName: string; type: string; direction: '单向' | '双向'; description: string; isPublic: boolean }[];
 }
@@ -606,6 +607,7 @@ export async function analyzeNovelText(
       "description": "背景介绍",
       "status": "alive|dead|unknown|mentioned",
       "currentLocation": "当前所在地点",
+      "arc": "角色弧光概述（根据文本推断角色的成长轨迹和转折点，50字以内。如果文本中信息不足，可留空字符串）",
       "resources": [{"name": "能力/物品名", "type": "能力|物品|代价|其他", "description": "描述", "status": "已获得|未获得|已消耗|进行中"}],
       "relations": [
         {
@@ -724,6 +726,7 @@ export async function applyAnalysisResult(
         description: existing.description || ec.description || existing.description,
         status: ec.status || existing.status,
         currentLocation: existing.currentLocation || ec.currentLocation || existing.currentLocation,
+        arc: existing.arc || ec.arc || existing.arc,
       };
       if (ec.resources?.length) {
         const existingResNames = new Set(existing.resources.map((r) => r.name));
@@ -756,6 +759,7 @@ export async function applyAnalysisResult(
         description: ec.description || '',
         status: ec.status || 'alive',
         currentLocation: ec.currentLocation,
+        arc: ec.arc,
         relations: [],
         resources: (ec.resources || []).map((r): Resource => ({
           id: generateId(),
@@ -1153,6 +1157,113 @@ export interface WorldCompletionSuggestion {
   description: string;
   relatedSettings: string[];
   suggestion: string;
+}
+
+// ========== V4.x 大纲 AI 优化 ==========
+
+export interface OutlineNodeInfo {
+  title: string;
+  type: string;
+  notes?: string;
+  children?: OutlineNodeInfo[];
+}
+
+export interface OutlineOptimizeInput {
+  nodes: OutlineNodeInfo[];
+  characters: { name: string; description: string }[];
+  totalChapters: number;
+}
+
+export interface OutlineOptimizeResult {
+  suggestions: string[];      // 优化建议列表
+  optimizedOutline: string;   // 优化后的大纲（Markdown 格式）
+}
+
+export async function optimizeOutline(input: OutlineOptimizeInput): Promise<OutlineOptimizeResult> {
+  const charInfo = input.characters.map((c) => `- ${c.name}：${c.description.slice(0, 60)}`).join('\n');
+
+  const nodeInfo = JSON.stringify(input.nodes.map((n) => ({
+    title: n.title, type: n.type, notes: n.notes || '',
+    children: n.children?.map((c) => ({ title: c.title, type: c.type })),
+  })), null, 2);
+
+  const messages: ChatMessage[] = [
+    {
+      role: 'system',
+      content: `你是一位小说结构编辑，擅长优化故事大纲。分析大纲结构，给出优化建议。返回 JSON。`,
+    },
+    {
+      role: 'user',
+      content: `当前大纲结构（JSON）：${nodeInfo.slice(0, 4000)}
+
+角色设定：
+${charInfo.slice(0, 1000)}
+
+当前总章节数：${input.totalChapters}
+
+请分析并返回 JSON：
+{
+  "suggestions": ["优化建议1", "优化建议2", ...],
+  "optimizedOutline": "优化后的大纲（Markdown格式，用层级标题表示卷/章/节/场景结构，每章附简要说明）"
+}
+
+优化要点：
+1. 检查故事节奏是否合理（起承转合）
+2. 建议增删合并章节
+3. 检查角色出场频率和弧光分布
+4. 伏笔埋设和回收时机建议`,
+    },
+  ];
+
+  const response = await callLLM(messages, 0.5);
+  const jsonStr = extractJSON(response);
+  const result = JSON.parse(jsonStr);
+  return {
+    suggestions: result.suggestions || [],
+    optimizedOutline: result.optimizedOutline || '',
+  };
+}
+
+// ========== V4.x AI 标签生成 ==========
+
+export async function generateTags(
+  context: {
+    characters: { name: string; description: string }[];
+    chapters: { title: string; summary?: string }[];
+    settings: { name: string; description: string }[];
+    foreshadows: { content: string }[];
+  }
+): Promise<{ name: string; color: string; description: string }[]> {
+  const charInfo = context.characters.map((c) => `${c.name}：${c.description.slice(0, 50)}`).join('|');
+  const chInfo = context.chapters.map((c) => `${c.title}`).join('|');
+  const setInfo = context.settings.map((s) => `${s.name}`).join('|');
+  const fsInfo = context.foreshadows.map((f) => f.content.slice(0, 30)).join('|');
+
+  const messages: ChatMessage[] = [
+    {
+      role: 'system',
+      content: `你是一位小说分类专家。根据作品内容生成标签（类型、风格、主题等标签）。返回 JSON 数组。`,
+    },
+    {
+      role: 'user',
+      content: `角色：${charInfo.slice(0, 1000)}
+章节：${chInfo.slice(0, 500)}
+设定：${setInfo.slice(0, 500)}
+伏笔：${fsInfo.slice(0, 500)}
+
+请为这部作品生成 5-10 个标签，返回 JSON 数组：
+[
+  {"name": "标签名", "color": "#c9a96e", "description": "简短说明"}
+]
+
+标签类型建议：故事类型（玄幻/都市/科幻...）、风格（热血/轻松/悬疑...）、主题（复仇/成长/爱情...）、元素（系统流/穿越/重生...）
+颜色从以下选： #c9a96e #5a9e6f #6b8cc9 #c44b4b #c99e4b #9b6ec9 #5ea4a4 #c97e6b`,
+    },
+  ];
+
+  const response = await callLLM(messages, 0.4);
+  const jsonStr = extractJSON(response);
+  return JSON.parse(jsonStr);
 }
 
 export interface WorldCompletionResult {
