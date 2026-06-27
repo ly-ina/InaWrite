@@ -2,6 +2,8 @@
   display: flex;
   height: 100vh;
   overflow: hidden;
+  background: var(--bg-primary);
+  color: var(--text-primary);
 }
 
 /* ========== 侧边栏 ========== */
@@ -193,6 +195,7 @@
   flex-direction: column;
   overflow: hidden;
   min-width: 0;
+  background: var(--bg-primary);
 }
 
 .main {
@@ -200,4 +203,5 @@
   overflow-y: auto;
   padding: 24px 32px;
   min-width: 0;
+  background: var(--bg-primary);
 }
