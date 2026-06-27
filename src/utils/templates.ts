@@ -4,7 +4,7 @@
  */
 
 import type {
-  Project, Character, Chapter, Foreshadow, WorldSetting,
+  Project, Character, Chapter, Foreshadow, WorldSetting, OutlineNode,
   ProjectExport
 } from '../types';
 import { generateId } from '../types';
@@ -165,6 +165,63 @@ export function getWorldSettingTemplate(projectId: string): WorldSetting[] {
         type: '',                   // 关联类型，如 "位于"、"属于"
       },
     ],
+  }];
+}
+
+/**
+ * 大纲导入模板
+ *
+ * 字段说明：
+ *   title                    - 节点标题（必填）
+ *   type                     - 类型：volume=卷 | chapter=章 | section=节 | scene=场景
+ *   parentId                 - 父节点 ID（null 表示根节点）
+ *   sortOrder                - 同级排序序号
+ *   chapterId                - 关联章节 ID（可选）
+ *   characters               - 计划出场角色 ID 列表
+ *   foreshadowsPlanted       - 计划埋设伏笔 ID 列表
+ *   foreshadowsResolved      - 计划回收伏笔 ID 列表
+ *   worldSettingsIntroduced  - 计划引入世界观设定 ID 列表
+ *   notes                    - 备注（Markdown，可选）
+ *   color                    - 节点颜色标记（可选）
+ *   estimatedWords           - 预估字数（可选）
+ */
+export function getOutlineTemplate(projectId: string): OutlineNode[] {
+  return [{
+    id: '<自动生成>',
+    projectId: '<自动填充>',
+    parentId: null,                  // null=根节点
+    type: 'volume',                  // volume=卷 | chapter=章 | section=节 | scene=场景
+    title: '',                       // 【必填】节点标题
+    sortOrder: 1000,                 // 同级排序序号
+    chapterId: undefined,            // 关联章节 ID（可选）
+    characters: [],                  // 计划出场角色 ID
+    foreshadowsPlanted: [],          // 计划埋设伏笔 ID
+    foreshadowsResolved: [],         // 计划回收伏笔 ID
+    worldSettingsIntroduced: [],     // 计划引入世界观设定 ID
+    notes: '',                       // 备注（Markdown）
+    color: '',                       // 颜色标记（可选）
+    estimatedWords: 0,               // 预估字数
+    collapsed: false,
+    createdAt: '<自动填充>',
+    updatedAt: '<自动填充>',
+  }, {
+    id: '<自动生成>',
+    projectId: '<自动填充>',
+    parentId: '<上一节点的自动填充ID>', // 子节点示例
+    type: 'chapter',
+    title: '',
+    sortOrder: 2000,
+    chapterId: undefined,
+    characters: [],
+    foreshadowsPlanted: [],
+    foreshadowsResolved: [],
+    worldSettingsIntroduced: [],
+    notes: '',
+    color: '',
+    estimatedWords: 0,
+    collapsed: false,
+    createdAt: '<自动填充>',
+    updatedAt: '<自动填充>',
   }];
 }
 

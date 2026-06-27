@@ -7,7 +7,7 @@ import { useState, useEffect } from 'react';
 import { useAppStore } from '../store/appStore';
 import {
   getCharacterTemplate, getChapterTemplate, getForeshadowTemplate,
-  getWorldSettingTemplate, downloadTemplateFile, generateFullExport,
+  getWorldSettingTemplate, getOutlineTemplate, downloadTemplateFile, generateFullExport,
 } from '../utils/templates';
 import { exportProject, downloadJSON, readJSONFile, executeImport } from '../utils/importExport';
 import { generateReport } from '../utils/backup';
@@ -28,6 +28,8 @@ const MODULE_TEMPLATES = [
     generator: (pid: string) => getForeshadowTemplate(pid) },
   { key: 'worldsetting', label: '设定模板', icon: '🌍', desc: '导入世界观设定的 JSON 格式模板，含完整字段注释',
     generator: (pid: string) => getWorldSettingTemplate(pid) },
+  { key: 'outline', label: '大纲模板', icon: '📋', desc: '导入大纲节点的 JSON 格式模板，含卷/章/节/场景示例',
+    generator: (pid: string) => getOutlineTemplate(pid) },
 ];
 
 export default function TemplatesPage() {
