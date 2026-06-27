@@ -59,17 +59,17 @@ export function getCharacterTemplate(projectId: string): Character[] {
     arc: '',                        // 角色弧光，如 "从逃避→接受→超越"
     secret: '',                     // 秘密（仅作者可见）
     voice: '',                      // 语言风格，如 "说话直率带口音"
-    relations: [                    // 关系列表，每个关系包含：
-      /* {
+    relations: [
+      {
         targetId: '',               // 关联角色 ID
         type: '朋友',               // 家人/朋友/恋人/敌人/对手/师徒/上下级/盟友/陌生人/其他
         direction: '双向',          // 单向=→ | 双向=↔
         description: '',            // 关系描述（可选）
         isPublic: true,             // 公开=true | 秘密=false
-      }, */
+      },
     ],
-    resources: [                    // 资源/能力列表，每个资源包含：
-      /* {
+    resources: [
+      {
         id: generateId(),
         name: '',                   // 名称
         type: '能力',               // 能力/物品/代价/其他
@@ -77,7 +77,7 @@ export function getCharacterTemplate(projectId: string): Character[] {
         status: '已获得',           // 未获得/已获得/已消耗/进行中
         obtainedAt: '',             // 获取时间/章节（可选）
         cost: '',                   // 使用代价（可选）
-      }, */
+      },
     ],
     appearances: [],                // 出场章节 ID 列表
   }];
@@ -107,11 +107,11 @@ export function getChapterTemplate(projectId: string): Chapter[] {
     wordCount: 0,                   // 字数（可选）
     status: 'draft',                // draft=草稿 | revising=修订中 | done=已完成
     summary: '',                    // 内容摘要（可选）
-    keyEvents: [],                  // 关键事件，如 ["事件1", "事件2"]
-    characters: [],                 // 出场角色 ID 列表
-    foreshadowsAdded: [],           // 新增伏笔 ID 列表
-    foreshadowsResolved: [],        // 回收伏笔 ID 列表
-    locations: [],                  // 地点 ID 列表
+    keyEvents: [''],                // 关键事件列表
+    characters: [''],               // 出场角色 ID 列表
+    foreshadowsAdded: [''],         // 新增伏笔 ID 列表
+    foreshadowsResolved: [''],      // 回收伏笔 ID 列表
+    locations: [''],                // 地点 ID 列表
   }];
 }
 
@@ -133,7 +133,7 @@ export function getForeshadowTemplate(projectId: string): Foreshadow[] {
     content: '',                    // 【必填】伏笔内容
     firstAppearance: '',            // 首次出现章节 ID
     status: 'pending',              // pending=未触发 | active=进行中 | resolved=已回收 | abandoned=已放弃
-    relatedCharacters: [],          // 相关角色 ID 列表
+    relatedCharacters: [''],        // 相关角色 ID 列表
     expectedResolution: '',         // 预计回收章节 ID（可选）
     notes: '',                      // 补充说明（可选）
   }];
@@ -159,19 +159,103 @@ export function getWorldSettingTemplate(projectId: string): WorldSetting[] {
     type: 'location',               // location=地点 | race=种族 | item=物品 | concept=概念 | history=历史 | custom=自定义
     description: '',                // 描述（支持 Markdown）
     parentId: undefined,            // 父级设定 ID（可选，用于层级）
-    relations: [                    // 关联设定列表
-      /* {
+    relations: [
+      {
         targetId: '',               // 关联设定 ID
         type: '',                   // 关联类型，如 "位于"、"属于"
-      }, */
+      },
     ],
   }];
 }
 
 // ========== 下载工具函数 ==========
 
+/**
+ * 生成带注释的 JSON 字符串
+ * 将 JS 对象序列化时保留行尾 // 注释
+ */
+function stringifyWithComments(obj: unknown, indent = 0): string {
+  const pad = '  '.repeat(indent);
+  const padIn = '  '.repeat(indent + 1);
+
+  if (obj === null || obj === undefined) return 'null';
+  if (typeof obj === 'string') return JSON.stringify(obj);
+  if (typeof obj === 'number' || typeof obj === 'boolean') return String(obj);
+
+  if (Array.isArray(obj)) {
+    if (obj.length === 0) return '[]';
+    const items = obj.map((item) => {
+      const str = stringifyWithComments(item, indent + 1);
+      // 尝试保留行尾注释（从原始对象获取）
+      return `${padIn}${str}`;
+    });
+    return `[\n${items.join(',\n')}\n${pad}]`;
+  }
+
+  if (typeof obj === 'object') {
+    const entries = Object.entries(obj as Record<string, unknown>);
+    if (entries.length === 0) return '{}';
+    const items = entries.map(([key, value]) => {
+      const valStr = stringifyWithComments(value, indent + 1);
+      // 尝试匹配原始注释
+      const comment = getComment(key);
+      return `${padIn}${JSON.stringify(key)}: ${valStr}${comment ? '  ' + comment : ''}`;
+    });
+    return `{\n${items.join(',\n')}\n${pad}}`;
+  }
+
+  return JSON.stringify(obj);
+}
+
+/** 字段注释映射表 */
+const FIELD_COMMENTS: Record<string, string> = {
+  name: '// 【必填】角色名',
+  aliases: '// 别名列表',
+  race: '// 种族，如 "人类"',
+  age: '// 年龄，如 "25岁"',
+  appearance: '// 外貌描述（支持 Markdown）',
+  personality: '// 性格描述（支持 Markdown）',
+  description: '// 背景故事（支持 Markdown）',
+  status: '// alive=存活 | dead=死亡 | unknown=未知 | mentioned=提及',
+  currentLocation: '// 当前所在地点',
+  arc: '// 角色弧光',
+  secret: '// 秘密（仅作者可见）',
+  voice: '// 语言风格提示',
+  targetId: '// 关联 ID',
+  type: '// 类型',
+  direction: '// 单向=→ | 双向=↔',
+  isPublic: '// 公开=true | 秘密=false',
+  resources: '// 资源/能力列表',
+  relations: '// 关系列表',
+  appearances: '// 出场章节 ID 列表',
+  obtainedAt: '// 获取时间/章节',
+  cost: '// 代价',
+  number: '// 章节序号',
+  title: '// 【必填】标题',
+  wordCount: '// 字数',
+  summary: '// 内容摘要',
+  keyEvents: '// 关键事件列表',
+  characters: '// 出场角色 ID 列表',
+  foreshadowsAdded: '// 新增伏笔 ID 列表',
+  foreshadowsResolved: '// 回收伏笔 ID 列表',
+  locations: '// 地点 ID 列表',
+  content: '// 【必填】内容',
+  firstAppearance: '// 首次出现章节 ID',
+  relatedCharacters: '// 相关角色 ID 列表',
+  expectedResolution: '// 预计回收章节 ID',
+  notes: '// 补充说明',
+  parentId: '// 父级设定 ID（可选）',
+  id: '// 自动生成',
+  projectId: '// 项目 ID',
+};
+
+function getComment(key: string): string {
+  return FIELD_COMMENTS[key] || '';
+}
+
 export function downloadTemplateFile(data: unknown, filename: string): void {
-  const json = JSON.stringify(data, null, 2);
+  // 使用带注释的序列化
+  const json = stringifyWithComments(data);
   const blob = new Blob([json], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
