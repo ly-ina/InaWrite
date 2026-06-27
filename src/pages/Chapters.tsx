@@ -278,6 +278,64 @@ export default function ChaptersPage() {
                 <textarea className="textarea" value={editingChapter.summary || ''}
                   onChange={(e) => setEditingChapter({ ...editingChapter, summary: e.target.value })} rows={4} />
               </div>
+              <div className="form-group">
+                <label>出场角色</label>
+                <div style={{ maxHeight: '150px', overflow: 'auto', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                  {characters.map((c) => (
+                    <label key={c.id} style={{ fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <input type="checkbox" checked={editingChapter.characters.includes(c.id)}
+                        onChange={() => {
+                          setEditingChapter({
+                            ...editingChapter,
+                            characters: editingChapter.characters.includes(c.id)
+                              ? editingChapter.characters.filter((x) => x !== c.id)
+                              : [...editingChapter.characters, c.id],
+                          });
+                        }} />
+                      {c.name}
+                    </label>
+                  ))}
+                  {characters.length === 0 && <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>暂无角色</span>}
+                </div>
+              </div>
+              <div className="form-group">
+                <label>新增伏笔</label>
+                <div style={{ maxHeight: '100px', overflow: 'auto' }}>
+                  {foreshadows.map((f) => (
+                    <label key={f.id} style={{ fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <input type="checkbox" checked={editingChapter.foreshadowsAdded.includes(f.id)}
+                        onChange={() => {
+                          setEditingChapter({
+                            ...editingChapter,
+                            foreshadowsAdded: editingChapter.foreshadowsAdded.includes(f.id)
+                              ? editingChapter.foreshadowsAdded.filter((x) => x !== f.id)
+                              : [...editingChapter.foreshadowsAdded, f.id],
+                          });
+                        }} />
+                      {f.content.slice(0, 30)}...
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div className="form-group">
+                <label>回收伏笔</label>
+                <div style={{ maxHeight: '100px', overflow: 'auto' }}>
+                  {foreshadows.map((f) => (
+                    <label key={f.id} style={{ fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <input type="checkbox" checked={editingChapter.foreshadowsResolved.includes(f.id)}
+                        onChange={() => {
+                          setEditingChapter({
+                            ...editingChapter,
+                            foreshadowsResolved: editingChapter.foreshadowsResolved.includes(f.id)
+                              ? editingChapter.foreshadowsResolved.filter((x) => x !== f.id)
+                              : [...editingChapter.foreshadowsResolved, f.id],
+                          });
+                        }} />
+                      {f.content.slice(0, 30)}...
+                    </label>
+                  ))}
+                </div>
+              </div>
               <div className="form-actions" style={{ borderTop: 'none', paddingTop: 0 }}>
                 <button className="btn" onClick={() => setEditingChapter(null)}>取消</button>
                 <button className="btn btn-primary" onClick={handleUpdate}>保存</button>

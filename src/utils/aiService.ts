@@ -680,6 +680,8 @@ export interface ApplyResult {
   worldSettingsUpdated: number;
   worldSettingRelationsAdded: number;
   foreshadowsAdded: number;
+  chaptersAdded?: number;
+  chaptersUpdated?: number;
 }
 
 /**

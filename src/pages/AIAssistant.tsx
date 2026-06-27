@@ -49,6 +49,11 @@ export default function AIAssistantPage() {
   const [selectAllSettings, setSelectAllSettings] = useState(true);
   const [selectAllForeshadows, setSelectAllForeshadows] = useState(true);
 
+  // 文本分析关联章节
+  const [analyzeChapterNum, setAnalyzeChapterNum] = useState<number>(0);
+  const [analyzeChapterTitle, setAnalyzeChapterTitle] = useState('');
+  const [linkToChapter, setLinkToChapter] = useState(false);
+
   // 创作建议
   const [suggestion, setSuggestion] = useState('');
   const [selectedChapterId, setSelectedChapterId] = useState('');
@@ -189,9 +194,51 @@ export default function AIAssistantPage() {
     setError('');
     try {
       const stats = await applySelectedResults(currentProject.id, analysisResult);
+
+      // 如果关联了章节，更新章节信息
+      if (linkToChapter && analyzeChapterNum > 0) {
+        const chapterStore = useChapterStore.getState();
+        // 找到或创建章节
+        let chapter = chapters.find((c) => c.number === analyzeChapterNum);
+        const charIds = characters.map((c) => c.id);
+        const fsIds = foreshadows.map((f) => f.id);
+
+        if (chapter) {
+          // 更新现有章节
+          const updated = {
+            ...chapter,
+            title: analyzeChapterTitle || chapter.title,
+            summary: analysisResult.summary || chapter.summary,
+            content: inputText || chapter.content,
+            characters: [...new Set([...chapter.characters, ...charIds])],
+            foreshadowsAdded: [...new Set([...chapter.foreshadowsAdded, ...fsIds])],
+            wordCount: chapter.content ? countWords(chapter.content) : chapter.wordCount,
+          };
+          await useChapterStore.getState().updateChapter(updated);
+          stats.chaptersUpdated = 1;
+        } else {
+          // 创建新章节
+          await useChapterStore.getState().createChapter({
+            projectId: currentProject.id,
+            number: analyzeChapterNum,
+            title: analyzeChapterTitle || `第${analyzeChapterNum}章`,
+            wordCount: countWords(inputText),
+            status: 'draft',
+            summary: analysisResult.summary || undefined,
+            content: inputText || undefined,
+            keyEvents: [],
+            characters: charIds,
+            foreshadowsAdded: fsIds,
+            foreshadowsResolved: [],
+            locations: [],
+          });
+          stats.chaptersAdded = 1;
+        }
+        await loadChapters(currentProject.id);
+      }
+
       setApplyStats(stats);
       triggerRefresh();
-      // 重新加载数据
       await loadCharacters(currentProject.id);
       await loadSettings(currentProject.id);
       await loadForeshadows(currentProject.id);
@@ -201,6 +248,12 @@ export default function AIAssistantPage() {
       setLoading(false);
     }
   };
+
+  function countWords(text: string): number {
+    const chinese = text.match(/[\u4e00-\u9fff]/g);
+    const words = text.match(/[a-zA-Z0-9]+/g);
+    return (chinese?.length || 0) + (words?.reduce((sum, w) => sum + Math.ceil(w.length / 5), 0) || 0);
+  }
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -486,6 +539,38 @@ export default function AIAssistantPage() {
                 <button className="btn btn-sm" onClick={() => setInputText('')}>清空</button>
               </div>
             </div>
+
+            {/* 章节关联选项 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px', flexWrap: 'wrap',
+              padding: '10px', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px' }}>
+                <input type="checkbox" checked={linkToChapter} onChange={(e) => {
+                  setLinkToChapter(e.target.checked);
+                  if (e.target.checked && analyzeChapterNum === 0) {
+                    setAnalyzeChapterNum(chapters.length > 0 ? Math.max(...chapters.map((c) => c.number)) + 1 : 1);
+                  }
+                }} />
+                关联到章节
+              </label>
+              {linkToChapter && (
+                <>
+                  <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>第</span>
+                  <input className="input" type="number" value={analyzeChapterNum}
+                    onChange={(e) => setAnalyzeChapterNum(Math.max(1, parseInt(e.target.value) || 1))}
+                    style={{ width: '70px', padding: '4px 8px', fontSize: '13px' }}
+                    min={1} max={chapters.length > 0 ? Math.max(...chapters.map((c) => c.number)) + 1 : 999} />
+                  <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>章</span>
+                  <input className="input" value={analyzeChapterTitle}
+                    onChange={(e) => setAnalyzeChapterTitle(e.target.value)}
+                    placeholder="章节标题（可选）"
+                    style={{ flex: 1, padding: '4px 8px', fontSize: '13px', maxWidth: '200px' }} />
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                    {chapters.find((c) => c.number === analyzeChapterNum) ? '（将更新已有章节）' : '（将创建新章节）'}
+                  </span>
+                </>
+              )}
+            </div>
+
             <textarea
               className={styles.textArea}
               value={inputText}
@@ -520,6 +605,9 @@ export default function AIAssistantPage() {
                   角色：新增 {applyStats.charactersAdded} / 更新 {applyStats.charactersUpdated} / 关系 +{applyStats.characterRelationsAdded}；
                   设定：新增 {applyStats.worldSettingsAdded} / 更新 {applyStats.worldSettingsUpdated} / 关系 +{applyStats.worldSettingRelationsAdded}；
                   伏笔：+{applyStats.foreshadowsAdded}
+                  {(applyStats.chaptersAdded || applyStats.chaptersUpdated) ? (
+                    <span>；章节：{applyStats.chaptersAdded ? `新增 ${applyStats.chaptersAdded}` : ''}{applyStats.chaptersAdded && applyStats.chaptersUpdated ? ' / ' : ''}{applyStats.chaptersUpdated ? `更新 ${applyStats.chaptersUpdated}` : ''}</span>
+                  ) : null}
                 </div>
               )}
 
