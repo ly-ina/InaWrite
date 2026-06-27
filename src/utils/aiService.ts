@@ -80,12 +80,112 @@ async function callLLM(messages: ChatMessage[], temperature = 0.3): Promise<stri
 
 /** 从 AI 回复中提取 JSON（可能包裹在 ```json 代码块中） */
 function extractJSON(text: string): string {
+  if (!text) throw new Error('AI 返回了空内容');
+  // 尝试匹配 ```json ... ``` 代码块
   const match = text.match(/```(?:json)?\s*([\s\S]*?)```/);
   if (match) return match[1].trim();
   // 尝试直接找 { 或 [ 开头的内容
   const trimmed = text.trim();
   if (trimmed.startsWith('{') || trimmed.startsWith('[')) return trimmed;
-  throw new Error('AI 回复中未找到有效的 JSON 数据');
+  // 尝试从文本中定位第一个 { 或 [ 并截取到对应的闭合
+  const startIdx = Math.min(
+    trimmed.indexOf('{') >= 0 ? trimmed.indexOf('{') : Infinity,
+    trimmed.indexOf('[') >= 0 ? trimmed.indexOf('[') : Infinity
+  );
+  if (startIdx < Infinity) {
+    const char = trimmed[startIdx];
+    const endChar = char === '{' ? '}' : ']';
+    let depth = 0;
+    let endIdx = -1;
+    for (let i = startIdx; i < trimmed.length; i++) {
+      if (trimmed[i] === char) depth++;
+      else if (trimmed[i] === endChar) { depth--; if (depth === 0) { endIdx = i; break; } }
+    }
+    if (endIdx > startIdx) return trimmed.slice(startIdx, endIdx + 1);
+  }
+  throw new Error(`AI 回复中未找到有效的 JSON 数据。原始回复前 200 字符：${(trimmed || '').slice(0, 200)}`);
+}
+
+/** 安全解析 JSON，提供更好的错误信息 */
+function safeJSONParse<T>(jsonStr: string, context: string): T {
+  try {
+    return JSON.parse(jsonStr) as T;
+  } catch (parseErr) {
+    // 尝试修复常见的 AI 返回 JSON 问题
+    let fixed = jsonStr;
+    try {
+      // 修复：尾部逗号
+      fixed = fixed.replace(/,(\s*[}\]])/g, '$1');
+      // 修复：无引号的 key
+      fixed = fixed.replace(/([{,]\s*)([a-zA-Z_]\w*)\s*:/g, '$1"$2":');
+      // 修复：值中的未转义双引号（"xxx"xxx" → "xxx'xxx"）
+      // 匹配 "key": "value with "inner" quotes" 模式
+      fixed = fixUnescapedQuotesInValues(fixed);
+      // 修复：值中换行符未转义
+      fixed = fixed.replace(/(?<=:\s*"[^"]*)\n(?=[^"]*")/g, '\\n');
+      return JSON.parse(fixed) as T;
+    } catch {
+      // 修复失败，抛出原始错误，附加上下文信息
+      const preview = (jsonStr || '').slice(0, 300);
+      const errMsg = parseErr instanceof Error ? parseErr.message : String(parseErr);
+      throw new Error(`[${context}] AI 返回的 JSON 解析失败：${errMsg}\nJSON 预览：${preview}`);
+    }
+  }
+}
+
+/**
+ * 修复 JSON 字符串值内部的未转义双引号
+ * 处理 AI 返回 JSON 中值内嵌套了 " 导致解析失败的情况
+ */
+function fixUnescapedQuotesInValues(jsonStr: string): string {
+  // 策略：找到所有 "key": " 位置，然后正确匹配到闭合的 "（跳过转义的 \"）
+  // 如果 value 内部出现未转义的 "，将其替换为中文引号「」
+  let result = '';
+  let i = 0;
+  while (i < jsonStr.length) {
+    // 匹配 "key": "
+    const keyMatch = jsonStr.slice(i).match(/"[^"]*"\s*:\s*"/);
+    if (!keyMatch || typeof keyMatch.index !== 'number') {
+      result += jsonStr.slice(i);
+      break;
+    }
+    const prefixEnd = i + keyMatch.index! + keyMatch[0].length;
+    result += jsonStr.slice(i, prefixEnd);
+    i = prefixEnd;
+
+    // 从当前字符开始找 value 的闭合引号
+    let j = i;
+    while (j < jsonStr.length) {
+      if (jsonStr[j] === '\\') {
+        j += 2; // 跳过转义字符
+      } else if (jsonStr[j] === '"') {
+        // 找到可能的闭合引号，检查后面是 , } ] 或空白
+        const after = jsonStr.slice(j + 1).match(/^\s*[,}\]]/);
+        if (after || j + 1 >= jsonStr.length) {
+          // 这是真正的闭合引号
+          result += jsonStr.slice(i, j + 1);
+          i = j + 1;
+          break;
+        } else {
+          // 这是值内部的引号，替换为中文左/右引号
+          result += jsonStr.slice(i, j);
+          // 判断用左引号还是右引号：看前面是否有空格或标点
+          const prev = j > i ? jsonStr[j - 1] : '';
+          const useLeft = prev === '' || prev === ' ' || prev === '（' || prev === '(' || prev === '【';
+          result += useLeft ? '\u300C' : '\u300D';
+          j++;
+          i = j;
+        }
+      } else {
+        j++;
+      }
+    }
+    if (j >= jsonStr.length) {
+      result += jsonStr.slice(i);
+      break;
+    }
+  }
+  return result;
 }
 
 // ========== 分析结果类型 ==========
@@ -553,7 +653,7 @@ ${context.projectGenre ? `作品类型：${context.projectGenre}` : ''}
 ${context.chapterTitle ? `当前章节：${context.chapterTitle}` : ''}
 ${context.currentCharacters?.length ? `已出场角色：${context.currentCharacters.join('、')}` : ''}
 ${context.currentForeshadows?.length ? `进行中的伏笔：${context.currentForeshadows.join('；')}` : ''}
-${context.chapterContent ? `章节内容摘要：${context.chapterContent.slice(0, 2000)}` : ''}
+${context.chapterContent ? `章节内容摘要：${(context.chapterContent || '').slice(0, 2000)}` : ''}
 
 请从以下角度给出建议：
 1. 情节推进方向
@@ -652,13 +752,13 @@ export async function analyzeNovelText(
     },
     {
       role: 'user',
-      content: `${existingCharsStr}\n${existingSettingsStr}\n${existingForeshadowsStr}\n\n---分析以下文本---\n${text.slice(0, 12000)}`,
+      content: `${existingCharsStr}\n${existingSettingsStr}\n${existingForeshadowsStr}\n\n---分析以下文本---\n${(text || '').slice(0, 12000)}`,
     },
   ];
 
   const response = await callLLM(messages, 0.2);
   const jsonStr = extractJSON(response);
-  const result = JSON.parse(jsonStr) as AnalysisResult;
+  const result = safeJSONParse<AnalysisResult>(jsonStr, '文本分析');
 
   // 确保字段存在
   return {
@@ -954,7 +1054,7 @@ ${characterResources.map((c) =>
 ).join('\n\n')}
 
 章节内容：
-${chapterContent.slice(0, 4000)}
+${(chapterContent || '').slice(0, 4000)}
 
 请分析并返回 JSON 数组，只包含状态确实发生了变化的资源：
 [{"characterName": "角色名", "resourceName": "资源名", "newStatus": "已获得|已消耗|进行中", "reason": "变化原因（简短）"}]`,
@@ -963,7 +1063,7 @@ ${chapterContent.slice(0, 4000)}
 
   const response = await callLLM(messages, 0.1);
   const jsonStr = extractJSON(response);
-  return JSON.parse(jsonStr) as { characterName: string; resourceName: string; newStatus: string; reason: string }[];
+  return safeJSONParse<{ characterName: string; resourceName: string; newStatus: string; reason: string }[]>(jsonStr, '资源更新分析');
 }
 
 /** 应用资源状态更新到数据库 */
@@ -1021,11 +1121,11 @@ export interface ContinueChapterResult {
 
 export async function continueChapter(input: ContinueChapterInput): Promise<ContinueChapterResult> {
   const charInfo = input.characters.map((c) =>
-    `- ${c.name}：${c.description.slice(0, 80)}${c.voice ? ` [语言风格：${c.voice}]` : ''}`
+    `- ${c.name || ''}：${(c.description || '').slice(0, 80)}${c.voice ? ` [语言风格：${c.voice}]` : ''}`
   ).join('\n');
 
   const foreshadowInfo = input.activeForeshadows.map((f) =>
-    `- ${f.content.slice(0, 60)}`
+    `- ${(f.content || '').slice(0, 60)}`
   ).join('\n');
 
   const messages: ChatMessage[] = [
@@ -1038,7 +1138,7 @@ export async function continueChapter(input: ContinueChapterInput): Promise<Cont
       content: `作品：${input.projectName}
 
 上一章「${input.lastChapterTitle}」内容：
-${input.lastChapterContent.slice(0, 3000)}
+${(input.lastChapterContent || '').slice(0, 3000)}
 
 角色设定：
 ${charInfo}
@@ -1061,7 +1161,7 @@ ${input.styleGuide ? `\n写作风格要求：${input.styleGuide}` : ''}
 
   const response = await callLLM(messages, 0.7);
   const jsonStr = extractJSON(response);
-  return JSON.parse(jsonStr) as ContinueChapterResult;
+  return safeJSONParse<ContinueChapterResult>(jsonStr, '章节续写');
 }
 
 // ========== V4.2 AI 一致性检查 ==========
@@ -1088,12 +1188,12 @@ export async function checkConsistency(
   settings: { name: string; description: string }[]
 ): Promise<ConsistencyReport> {
   const chapterText = chapters.map((ch) =>
-    `第${ch.number}章「${ch.title}」：${(ch.content || ch.summary || '').slice(0, 500)}`
+    `第${ch.number}章「${ch.title || ''}」：${(ch.content || ch.summary || '').slice(0, 500)}`
   ).join('\n\n');
 
-  const charText = characters.map((c) => `- ${c.name}（${c.status}）：${c.description.slice(0, 100)}`).join('\n');
-  const fsText = foreshadows.map((f) => `- [${f.status}] ${f.content.slice(0, 80)}`).join('\n');
-  const settingText = settings.map((s) => `- ${s.name}：${s.description.slice(0, 100)}`).join('\n');
+  const charText = characters.map((c) => `- ${c.name || ''}（${c.status || ''}）：${(c.description || '').slice(0, 100)}`).join('\n');
+  const fsText = foreshadows.map((f) => `- [${f.status || ''}] ${(f.content || '').slice(0, 80)}`).join('\n');
+  const settingText = settings.map((s) => `- ${s.name || ''}：${(s.description || '').slice(0, 100)}`).join('\n');
 
   const messages: ChatMessage[] = [
     {
@@ -1143,7 +1243,7 @@ ${settingText.slice(0, 1500)}
 
   const response = await callLLM(messages, 0.2);
   const jsonStr = extractJSON(response);
-  const result = JSON.parse(jsonStr);
+  const result = safeJSONParse<{ issues: any[]; summary: string; score: number }>(jsonStr, '一致性检查');
   return {
     issues: result.issues || [],
     summary: result.summary || '',
@@ -1182,7 +1282,7 @@ export interface OutlineOptimizeResult {
 }
 
 export async function optimizeOutline(input: OutlineOptimizeInput): Promise<OutlineOptimizeResult> {
-  const charInfo = input.characters.map((c) => `- ${c.name}：${c.description.slice(0, 60)}`).join('\n');
+  const charInfo = input.characters.map((c) => `- ${c.name || ''}：${(c.description || '').slice(0, 60)}`).join('\n');
 
   const nodeInfo = JSON.stringify(input.nodes.map((n) => ({
     title: n.title, type: n.type, notes: n.notes || '',
@@ -1219,7 +1319,7 @@ ${charInfo.slice(0, 1000)}
 
   const response = await callLLM(messages, 0.5);
   const jsonStr = extractJSON(response);
-  const result = JSON.parse(jsonStr);
+  const result = safeJSONParse<{ suggestions: any[]; optimizedOutline: string }>(jsonStr, '大纲优化');
   return {
     suggestions: result.suggestions || [],
     optimizedOutline: result.optimizedOutline || '',
@@ -1236,10 +1336,10 @@ export async function generateTags(
     foreshadows: { content: string }[];
   }
 ): Promise<{ name: string; color: string; description: string }[]> {
-  const charInfo = context.characters.map((c) => `${c.name}：${c.description.slice(0, 50)}`).join('|');
-  const chInfo = context.chapters.map((c) => `${c.title}`).join('|');
-  const setInfo = context.settings.map((s) => `${s.name}`).join('|');
-  const fsInfo = context.foreshadows.map((f) => f.content.slice(0, 30)).join('|');
+  const charInfo = context.characters.map((c) => `${c.name || ''}：${(c.description || '').slice(0, 50)}`).join('|');
+  const chInfo = context.chapters.map((c) => `${c.title || ''}`).join('|');
+  const setInfo = context.settings.map((s) => `${s.name || ''}`).join('|');
+  const fsInfo = context.foreshadows.map((f) => (f.content || '').slice(0, 30)).join('|');
 
   const messages: ChatMessage[] = [
     {
@@ -1265,7 +1365,7 @@ export async function generateTags(
 
   const response = await callLLM(messages, 0.4);
   const jsonStr = extractJSON(response);
-  return JSON.parse(jsonStr);
+  return safeJSONParse<{ name: string; color: string; description: string }[]>(jsonStr, '标签生成');
 }
 
 export interface WorldCompletionResult {
@@ -1277,7 +1377,7 @@ export async function completeWorldSettings(
   settings: { name: string; type: string; description: string; parentName?: string }[]
 ): Promise<WorldCompletionResult> {
   const settingText = settings.map((s) =>
-    `- [${s.type}] ${s.name}${s.parentName ? `（属于：${s.parentName}）` : ''}：${s.description.slice(0, 120)}`
+    `- [${s.type || '未知'}] ${s.name || ''}${s.parentName ? `（属于：${s.parentName}）` : ''}：${(s.description || '').slice(0, 120)}`
   ).join('\n');
 
   const messages: ChatMessage[] = [
@@ -1313,7 +1413,7 @@ ${settingText.slice(0, 5000)}
 
   const response = await callLLM(messages, 0.4);
   const jsonStr = extractJSON(response);
-  const result = JSON.parse(jsonStr);
+  const result = safeJSONParse<{ suggestions: any[]; summary: string }>(jsonStr, '世界观补全');
   return {
     suggestions: result.suggestions || [],
     summary: result.summary || '',
@@ -1416,4 +1516,114 @@ export function diffSnapshots(a: DataSnapshot, b: DataSnapshot): string {
   diffCount('世界观设定', a.data.worldSettings, b.data.worldSettings);
 
   return lines.join('\n');
+}
+
+// ========== AI 助手会话状态持久化 ==========
+
+const SESSION_PREFIX = 'inakb_ai_session_';
+
+export interface AISessionState {
+  activeTab: string;
+  // 文本分析
+  inputText: string;
+  analysisResult: any;
+  applyStats: any;
+  expandedSection: string[];
+  linkToChapter: boolean;
+  analyzeChapterNum: number;
+  analyzeChapterTitle: string;
+  // 创作建议
+  suggestion: string;
+  selectedChapterId: string;
+  arcCharId: string;
+  arcResult: string;
+  // 资源更新
+  resourceUpdates: any[];
+  // 章节续写
+  continueChapterId: string;
+  continueOutline: string;
+  continueStyle: string;
+  continueResult: any;
+  // 一致性检查
+  consistencyReport: any;
+  // 世界观补全
+  worldCompletion: any;
+}
+
+/** 保存 AI 助手会话状态 */
+export function saveAISession(projectId: string, state: Partial<AISessionState>): void {
+  try {
+    const key = `${SESSION_PREFIX}${projectId}`;
+    const existing = getAISession(projectId);
+    const merged = { ...existing, ...state };
+    localStorage.setItem(key, JSON.stringify(merged));
+  } catch { /* ignore */ }
+}
+
+/** 获取 AI 助手会话状态 */
+export function getAISession(projectId: string): Partial<AISessionState> {
+  try {
+    const raw = localStorage.getItem(`${SESSION_PREFIX}${projectId}`);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+/** 清除 AI 助手会话状态 */
+export function clearAISession(projectId: string): void {
+  localStorage.removeItem(`${SESSION_PREFIX}${projectId}`);
+}
+
+// ========== AI 操作历史记录 ==========
+
+const HISTORY_PREFIX = 'inakb_ai_history_';
+
+export interface AIHistoryEntry {
+  id: string;
+  projectId: string;
+  type: 'analyze' | 'suggest' | 'resources' | 'continue' | 'consistency' | 'complete';
+  label: string;
+  timestamp: string;
+  summary: string;
+  detail?: any;
+}
+
+/** 保存 AI 操作历史 */
+export function addAIHistory(entry: Omit<AIHistoryEntry, 'id' | 'timestamp'>): AIHistoryEntry {
+  const record: AIHistoryEntry = {
+    ...entry,
+    id: generateId(),
+    timestamp: new Date().toISOString(),
+  };
+  try {
+    const key = `${HISTORY_PREFIX}${entry.projectId}`;
+    const history = getAIHistory(entry.projectId);
+    history.unshift(record);
+    // 最多保留 100 条
+    if (history.length > 100) history.length = 100;
+    localStorage.setItem(key, JSON.stringify(history));
+  } catch { /* ignore */ }
+  return record;
+}
+
+/** 获取 AI 操作历史 */
+export function getAIHistory(projectId: string): AIHistoryEntry[] {
+  try {
+    const raw = localStorage.getItem(`${HISTORY_PREFIX}${projectId}`);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+/** 删除单条 AI 历史 */
+export function deleteAIHistory(projectId: string, id: string): void {
+  const history = getAIHistory(projectId).filter((h) => h.id !== id);
+  localStorage.setItem(`${HISTORY_PREFIX}${projectId}`, JSON.stringify(history));
+}
+
+/** 清空 AI 历史 */
+export function clearAIHistory(projectId: string): void {
+  localStorage.removeItem(`${HISTORY_PREFIX}${projectId}`);
 }

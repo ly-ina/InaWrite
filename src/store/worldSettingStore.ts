@@ -24,7 +24,17 @@ export const useWorldSettingStore = create<WorldSettingState>((set) => ({
     set({ loading: true });
     try {
       const settings = await db.worldSettings.getByProject(projectId);
-      set({ settings, loading: false });
+      // 过滤无效数据：name 为空或只有空白字符的设定
+      const validSettings = settings.filter((s) => s.name && s.name.trim().length > 0);
+      const invalidSettings = settings.filter((s) => !s.name || s.name.trim().length === 0);
+      // 从数据库中删除无效数据
+      if (invalidSettings.length > 0) {
+        console.warn(`[WorldSettings] 清理 ${invalidSettings.length} 条无效空数据`);
+        for (const inv of invalidSettings) {
+          await db.worldSettings.remove(inv.id).catch(() => { /* ignore */ });
+        }
+      }
+      set({ settings: validSettings, loading: false });
     } catch (error) {
       console.error('加载世界观设定失败:', error);
       set({ loading: false });

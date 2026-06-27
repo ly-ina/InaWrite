@@ -17,6 +17,9 @@ import {
   matchAnalysisWithExisting,
   continueChapter, checkConsistency, completeWorldSettings,
   createSnapshot, getSnapshots, deleteSnapshot, restoreSnapshot, diffSnapshots,
+  saveAISession, getAISession, clearAISession,
+  addAIHistory, getAIHistory, deleteAIHistory, clearAIHistory,
+  type AISessionState, type AIHistoryEntry,
   type AnalysisResult, type ApplyResult,
   type MatchableAnalysisResult, type MatchableCharacter,
   type MatchableWorldSetting, type MatchableForeshadow,
@@ -27,7 +30,7 @@ import {
 } from '../utils/aiService';
 import styles from './AIAssistant.module.css';
 
-type TabKey = 'analyze' | 'suggest' | 'resources' | 'continue' | 'consistency' | 'complete' | 'history' | 'settings';
+type TabKey = 'analyze' | 'suggest' | 'resources' | 'continue' | 'consistency' | 'complete' | 'snapshots' | 'history' | 'settings';
 
 export default function AIAssistantPage() {
   const { currentProject, refreshKey, triggerRefresh } = useAppStore();
@@ -36,7 +39,17 @@ export default function AIAssistantPage() {
   const { foreshadows, loadForeshadows } = useForeshadowStore();
   const { chapters, loadChapters } = useChapterStore();
 
-  const [activeTab, setActiveTab] = useState<TabKey>('analyze');
+  // 从 localStorage 同步读取初始 activeTab，避免闪烁
+  const [activeTab, setActiveTab] = useState<TabKey>(() => {
+    try {
+      const state = useAppStore.getState();
+      if (state.currentProject) {
+        const saved = getAISession(state.currentProject.id);
+        if (saved.activeTab) return saved.activeTab as TabKey;
+      }
+    } catch { /* ignore */ }
+    return 'analyze';
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -92,6 +105,7 @@ export default function AIAssistantPage() {
 
   // 文件上传
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isRestoringRef = useRef(true);  // 标记是否正在恢复会话，恢复期间不保存
 
   useEffect(() => {
     if (currentProject) {
@@ -99,8 +113,65 @@ export default function AIAssistantPage() {
       loadSettings(currentProject.id);
       loadForeshadows(currentProject.id);
       loadChapters(currentProject.id);
+      // 恢复上次会话状态
+      isRestoringRef.current = true;
+      const saved = getAISession(currentProject.id);
+      if (saved.activeTab) setActiveTab(saved.activeTab as TabKey);
+      if (saved.inputText) setInputText(saved.inputText);
+      if (saved.analysisResult) setAnalysisResult(saved.analysisResult);
+      if (saved.applyStats) setApplyStats(saved.applyStats);
+      if (saved.expandedSection) setExpandedSection(new Set(saved.expandedSection));
+      if (saved.linkToChapter !== undefined) setLinkToChapter(saved.linkToChapter);
+      if (saved.analyzeChapterNum) setAnalyzeChapterNum(saved.analyzeChapterNum);
+      if (saved.analyzeChapterTitle) setAnalyzeChapterTitle(saved.analyzeChapterTitle);
+      if (saved.suggestion) setSuggestion(saved.suggestion);
+      if (saved.selectedChapterId) setSelectedChapterId(saved.selectedChapterId);
+      if (saved.arcCharId) setArcCharId(saved.arcCharId);
+      if (saved.arcResult) setArcResult(saved.arcResult);
+      if (saved.resourceUpdates) setResourceUpdates(saved.resourceUpdates);
+      if (saved.continueChapterId) setContinueChapterId(saved.continueChapterId);
+      if (saved.continueOutline) setContinueOutline(saved.continueOutline);
+      if (saved.continueStyle) setContinueStyle(saved.continueStyle);
+      if (saved.continueResult) setContinueResult(saved.continueResult);
+      if (saved.consistencyReport) setConsistencyReport(saved.consistencyReport);
+      if (saved.worldCompletion) setWorldCompletion(saved.worldCompletion);
+      // 延迟取消恢复标记，确保所有 setState 都完成
+      setTimeout(() => { isRestoringRef.current = false; }, 100);
     }
   }, [currentProject, loadCharacters, loadSettings, loadForeshadows, loadChapters, refreshKey]);
+
+  // 保存会话状态（每次状态变化时自动保存，恢复期间跳过）
+  useEffect(() => {
+    if (!currentProject || isRestoringRef.current) return;
+    const state: Partial<AISessionState> = {
+      activeTab,
+      inputText,
+      analysisResult,
+      applyStats,
+      expandedSection: Array.from(expandedSection),
+      linkToChapter,
+      analyzeChapterNum,
+      analyzeChapterTitle,
+      suggestion,
+      selectedChapterId,
+      arcCharId,
+      arcResult,
+      resourceUpdates,
+      continueChapterId,
+      continueOutline,
+      continueStyle,
+      continueResult,
+      consistencyReport,
+      worldCompletion,
+    };
+    saveAISession(currentProject.id, state);
+  }, [
+    currentProject, activeTab, inputText, analysisResult, applyStats,
+    expandedSection, linkToChapter, analyzeChapterNum, analyzeChapterTitle,
+    suggestion, selectedChapterId, arcCharId, arcResult, resourceUpdates,
+    continueChapterId, continueOutline, continueStyle, continueResult,
+    consistencyReport, worldCompletion,
+  ]);
 
   const toggleSection = (key: string) => {
     setExpandedSection((prev) => {
@@ -181,6 +252,17 @@ export default function AIAssistantPage() {
       setSelectAllChars(true);
       setSelectAllSettings(true);
       setSelectAllForeshadows(true);
+      // 添加历史记录
+      const newCount = matched.characters.filter((c: any) => c._matchStatus === 'new').length +
+        matched.worldSettings.filter((w: any) => w._matchStatus === 'new').length +
+        matched.foreshadows.filter((f: any) => f._matchStatus === 'new').length;
+      addAIHistory({
+        projectId: currentProject.id,
+        type: 'analyze',
+        label: '文本分析',
+        summary: `提取了 ${matched.characters.length} 个角色、${matched.worldSettings.length} 个设定、${matched.foreshadows.length} 个伏笔（新增 ${newCount} 项）`,
+        detail: { inputPreview: inputText.slice(0, 200) },
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : '分析失败');
     } finally {
@@ -280,6 +362,12 @@ export default function AIAssistantPage() {
         currentForeshadows: foreshadows.filter((f) => f.status === 'active').map((f) => f.content),
       });
       setSuggestion(result);
+      addAIHistory({
+        projectId: currentProject.id,
+        type: 'suggest',
+        label: '创作建议',
+        summary: result.slice(0, 200) + (result.length > 200 ? '...' : ''),
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : '请求失败');
     } finally {
@@ -306,6 +394,13 @@ export default function AIAssistantPage() {
         }))
       );
       setResourceUpdates(updates);
+      addAIHistory({
+        projectId: currentProject.id,
+        type: 'resources',
+        label: '资源扫描',
+        summary: `检测到 ${updates.length} 项资源状态变化`,
+        detail: { updates },
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : '分析失败');
     } finally {
@@ -377,6 +472,13 @@ export default function AIAssistantPage() {
       };
       const result = await continueChapter(input);
       setContinueResult(result);
+      addAIHistory({
+        projectId: currentProject.id,
+        type: 'continue',
+        label: '章节续写',
+        summary: `续写「${result.title}」（${result.wordCount}字）`,
+        detail: { title: result.title, contentPreview: result.content.slice(0, 200) },
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : '续写失败');
     } finally {
@@ -420,6 +522,13 @@ export default function AIAssistantPage() {
         settings.map((s) => ({ name: s.name, description: s.description })),
       );
       setConsistencyReport(report);
+      addAIHistory({
+        projectId: currentProject.id,
+        type: 'consistency',
+        label: '一致性检查',
+        summary: `评分 ${report.score}/100，发现 ${report.issues.length} 个问题`,
+        detail: { score: report.score, issueCount: report.issues.length },
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : '检查失败');
     } finally {
@@ -441,6 +550,13 @@ export default function AIAssistantPage() {
         })),
       );
       setWorldCompletion(result);
+      addAIHistory({
+        projectId: currentProject.id,
+        type: 'complete',
+        label: '世界观补全',
+        summary: `${result.summary.slice(0, 200)}（${result.suggestions.length} 条建议）`,
+        detail: { suggestionCount: result.suggestions.length },
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : '补全失败');
     } finally {
@@ -503,7 +619,8 @@ export default function AIAssistantPage() {
           { key: 'resources', label: '🔄 资源追踪', desc: '根据章节内容智能更新角色资源状态' },
           { key: 'consistency', label: '🔍 一致性检查', desc: '扫描全文检测设定矛盾' },
           { key: 'complete', label: '🌐 世界观补全', desc: 'AI 根据已有设定推断和补全' },
-          { key: 'history', label: '📜 版本历史', desc: '数据快照与版本管理' },
+          { key: 'history', label: '📋 操作历史', desc: '查看历次 AI 操作记录' },
+          { key: 'snapshots', label: '📜 版本快照', desc: '数据快照与版本管理' },
           { key: 'settings', label: '⚙️ 设置', desc: '配置 API 和模型' },
         ] as const).map((tab) => (
           <button
@@ -999,8 +1116,11 @@ export default function AIAssistantPage() {
         </div>
       )}
 
+      {/* ===== AI 操作历史 ===== */}
+      {activeTab === 'history' && <AIHistoryTab projectId={currentProject.id} />}
+
       {/* ===== V4.4 版本历史 ===== */}
-      {activeTab === 'history' && (
+      {activeTab === 'snapshots' && (
         <div className={styles.tabContent}>
           <div className={styles.formCard}>
             <h3>📜 版本历史</h3>
@@ -1100,6 +1220,89 @@ export default function AIAssistantPage() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ========== AI 操作历史 Tab 组件 ==========
+
+const TYPE_LABELS: Record<string, string> = {
+  analyze: '📖 文本分析',
+  suggest: '💡 创作建议',
+  resources: '🔄 资源扫描',
+  continue: '✍️ 章节续写',
+  consistency: '🔍 一致性检查',
+  complete: '🌐 世界观补全',
+};
+
+function AIHistoryTab({ projectId }: { projectId: string }) {
+  const [history, setHistory] = useState<AIHistoryEntry[]>([]);
+
+  useEffect(() => {
+    setHistory(getAIHistory(projectId));
+  }, [projectId]);
+
+  const handleClear = () => {
+    if (!confirm('确定清空所有 AI 操作历史？')) return;
+    clearAIHistory(projectId);
+    setHistory([]);
+  };
+
+  const handleDelete = (id: string) => {
+    deleteAIHistory(projectId, id);
+    setHistory((prev) => prev.filter((h) => h.id !== id));
+  };
+
+  if (history.length === 0) {
+    return (
+      <div className={styles.tabContent}>
+        <div className={styles.formCard}>
+          <h3>📋 AI 操作历史</h3>
+          <p className={styles.hint}>AI 助手的所有操作记录将显示在这里，方便回顾和追溯。</p>
+          <div className={styles.emptyHint} style={{ textAlign: 'center', padding: '30px' }}>
+            📭 暂无操作记录
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={styles.tabContent}>
+      <div className={styles.formCard}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+          <h3>📋 AI 操作历史（{history.length} 条）</h3>
+          <button className="btn btn-sm" style={{ color: 'var(--danger)' }} onClick={handleClear}>
+            🗑 清空
+          </button>
+        </div>
+        <div className={styles.itemList}>
+          {history.map((entry) => (
+            <div key={entry.id} className={styles.resourceUpdateItem} style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                  <span style={{ fontWeight: 600 }}>
+                    {TYPE_LABELS[entry.type] || entry.label}
+                  </span>
+                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                    {new Date(entry.timestamp).toLocaleString('zh-CN')}
+                  </span>
+                </div>
+                <div style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                  {entry.summary}
+                </div>
+              </div>
+              <button
+                className="btn btn-sm btn-ghost"
+                style={{ color: 'var(--danger)', fontSize: '11px', flexShrink: 0, marginLeft: '8px' }}
+                onClick={() => handleDelete(entry.id)}
+              >
+                删除
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

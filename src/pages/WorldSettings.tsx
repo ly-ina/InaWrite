@@ -90,11 +90,12 @@ export default function WorldSettingsPage() {
   // 搜索过滤（使用 any 避免递归类型复杂性）
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const filterTree = (nodes: any[]): any[] => {
-    if (!search) return nodes;
+    if (!search) return nodes.filter((n) => n && n.name);
     const result: typeof tree = [];
     nodes.forEach((node) => {
-      const matches = node.name.includes(search) || node.description.includes(search);
-      const filteredChildren = filterTree(node.children);
+      if (!node || !node.name) return; // 跳过无效节点
+      const matches = (node.name || '').includes(search) || (node.description || '').includes(search);
+      const filteredChildren = filterTree(node.children || []);
       if (matches || filteredChildren.length > 0) {
         result.push({ ...node, children: filteredChildren });
       }
@@ -210,8 +211,9 @@ export default function WorldSettingsPage() {
   /** 递归渲染树节点 */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const renderTreeNode = (node: any, depth: number = 0) => {
+    if (!node || !node.id || !node.name) return null; // 跳过无效节点
     const isExpanded = expandedIds.has(node.id);
-    const hasChildren = node.children.length > 0;
+    const hasChildren = node.children && node.children.length > 0;
 
     return (
       <div key={node.id}>
@@ -327,8 +329,8 @@ export default function WorldSettingsPage() {
                 .filter(([k]) => filterType === 'all' || filterType === k)
                 .map(([typeKey, typeName]) => {
                   const items = settings
-                    .filter((s) => s.type === typeKey)
-                    .filter((s) => !search || s.name.includes(search) || s.description.includes(search));
+                    .filter((s) => s.name && s.type === typeKey)
+                    .filter((s) => !search || (s.name || '').includes(search) || (s.description || '').includes(search));
                   if (items.length === 0) return null;
                   return (
                     <div key={typeKey} className={styles.groupBlock}>
@@ -361,7 +363,7 @@ export default function WorldSettingsPage() {
           ) : (
             /* 树形视图 */
             <div className={styles.treeList}>
-              {filteredTree.map((node) => renderTreeNode(node))}
+              {filteredTree.filter((n) => n && n.name).map((node) => renderTreeNode(node))}
             </div>
           )}
         </div>
