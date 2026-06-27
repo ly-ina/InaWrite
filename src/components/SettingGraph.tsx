@@ -271,12 +271,12 @@ export function SettingGraph({ settings, centerId, onNodeClick }: Props) {
         .attr('y2', (d) => (d.target as GraphNode).y ?? 0);
 
       // 更新箭头三角坐标：在 target 端，连线方向末端
-      linkGroup.selectAll<SVGPolygonElement>('polygon')
-        .attr('points', (d) => {
-          const tx = (d.target as GraphNode).x ?? 0;
-          const ty = (d.target as GraphNode).y ?? 0;
-          const sx = (d.source as GraphNode).x ?? 0;
-          const sy = (d.source as GraphNode).y ?? 0;
+      linkGroup.selectAll('polygon')
+        .attr('points', (d: any) => {
+          const tx = (d?.target as GraphNode)?.x ?? 0;
+          const ty = (d?.target as GraphNode)?.y ?? 0;
+          const sx = (d?.source as GraphNode)?.x ?? 0;
+          const sy = (d?.source as GraphNode)?.y ?? 0;
           const dx = tx - sx;
           const dy = ty - sy;
           const len = Math.sqrt(dx * dx + dy * dy);
@@ -284,7 +284,7 @@ export function SettingGraph({ settings, centerId, onNodeClick }: Props) {
           const ux = dx / len;
           const uy = dy / len;
           // 箭头基部在 target 节点边缘外一点
-          const targetR = getNodeRadius(d.target as GraphNode);
+          const targetR = getNodeRadius(d?.target as GraphNode);
           const baseX = tx - ux * (targetR + 2);
           const baseY = ty - uy * (targetR + 2);
           // 垂直方向

@@ -4,7 +4,7 @@
  * 支持 OpenAI 兼容 API（可切换为本地模型或其他服务商）
  */
 
-import type { Character, Chapter, Foreshadow, WorldSetting, Resource } from '../types';
+import type { Character, Chapter, Foreshadow, WorldSetting, Resource, Relation } from '../types';
 import { generateId } from '../types';
 import { db } from '../db/database';
 
