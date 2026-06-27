@@ -223,20 +223,34 @@ export default function ProjectsPage() {
       {/* 导入冲突对话框 */}
       {importConflicts.length > 0 && (
         <div className="modal-overlay">
-          <div className="modal" style={{ maxWidth: '500px' }}>
+          <div className="modal" style={{ maxWidth: '550px' }}>
             <h2>检测到数据冲突</h2>
             <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '12px' }}>
-              以下 {importConflicts.length} 条数据 ID 与现有数据重复：
+              以下 {importConflicts.length} 条数据与现有数据冲突：
             </p>
             <div style={{ maxHeight: '200px', overflow: 'auto', marginBottom: '12px' }}>
               {importConflicts.map((c, i) => (
-                <div key={i} style={{ fontSize: '13px', padding: '4px 0', color: 'var(--text-secondary)' }}>
-                  [{c.type}] ID: {c.existingId}
+                <div key={i} style={{ fontSize: '13px', padding: '6px 0', color: 'var(--text-secondary)', borderBottom: i < importConflicts.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                  <span style={{ fontWeight: 600 }}>
+                    [{c.type === 'character' ? '角色' : c.type === 'chapter' ? '章节' : c.type === 'foreshadow' ? '伏笔' : '设定'}]
+                  </span>
+                  {' '}
+                  {c.existingName && <span style={{ color: 'var(--accent)' }}>{c.existingName}</span>}
+                  {c.matchType === 'name' && (
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginLeft: '6px' }}>
+                      (同名匹配)
+                    </span>
+                  )}
+                  {c.matchType === 'id' && (
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginLeft: '6px' }}>
+                      ID: {c.existingId.slice(0, 12)}...
+                    </span>
+                  )}
                 </div>
               ))}
             </div>
             <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '16px' }}>
-              选择「覆盖」将用导入数据替换现有数据，选择「跳过」将只添加不冲突的数据。
+              选择「覆盖」将用导入数据更新现有数据，选择「跳过」将只添加不冲突的新数据。
             </p>
             <div className="form-actions" style={{ borderTop: 'none', paddingTop: 0 }}>
               <button className="btn" onClick={() => setImportConflicts([])}>取消导入</button>

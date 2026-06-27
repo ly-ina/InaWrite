@@ -59,6 +59,7 @@ export default function CharactersPage() {
 
   // 资源编辑
   const [editingResource, setEditingResource] = useState(false);
+  const [editingResourceId, setEditingResourceId] = useState<string | null>(null); // null=新增, string=编辑已有
   const [resName, setResName] = useState('');
   const [resType, setResType] = useState<Resource['type']>('能力');
   const [resDesc, setResDesc] = useState('');
@@ -232,28 +233,61 @@ export default function CharactersPage() {
   };
 
   // ===== 资源操作 =====
-  const addResource = () => {
+  const resetResourceForm = () => {
+    setEditingResource(false);
+    setEditingResourceId(null);
+    setResName('');
+    setResType('能力');
+    setResDesc('');
+    setResCost('');
+    setResStatus('已获得');
+    setResObtainedAt('');
+  };
+
+  const openEditResource = (res: Resource) => {
+    setEditingResourceId(res.id);
+    setResName(res.name);
+    setResType(res.type || '能力');
+    setResDesc(res.description);
+    setResCost(res.cost || '');
+    setResStatus(res.status);
+    setResObtainedAt(res.obtainedAt || '');
+    setEditingResource(true);
+  };
+
+  const saveResource = () => {
     if (!resName || !selectedChar) return;
-    const newRes: Resource = {
-      id: generateId(),
-      name: resName,
-      type: resType || '其他',
-      description: resDesc,
-      status: resStatus,
-      obtainedAt: resObtainedAt || undefined,
-      cost: resCost || undefined,
-    };
-    const updated = { ...selectedChar, resources: [...selectedChar.resources, newRes] };
-    updateCharacter(updated).then(() => {
-      loadCharacters(currentProject!.id);
-      setEditingResource(false);
-      setResName('');
-      setResType('能力');
-      setResDesc('');
-      setResCost('');
-      setResStatus('已获得');
-      setResObtainedAt('');
-    });
+    if (editingResourceId) {
+      // 编辑已有
+      const updated = {
+        ...selectedChar,
+        resources: selectedChar.resources.map((r) =>
+          r.id === editingResourceId
+            ? { ...r, name: resName, type: resType || '其他', description: resDesc, status: resStatus, obtainedAt: resObtainedAt || undefined, cost: resCost || undefined }
+            : r
+        ),
+      };
+      updateCharacter(updated).then(() => {
+        loadCharacters(currentProject!.id);
+        resetResourceForm();
+      });
+    } else {
+      // 新增
+      const newRes: Resource = {
+        id: generateId(),
+        name: resName,
+        type: resType || '其他',
+        description: resDesc,
+        status: resStatus,
+        obtainedAt: resObtainedAt || undefined,
+        cost: resCost || undefined,
+      };
+      const updated = { ...selectedChar, resources: [...selectedChar.resources, newRes] };
+      updateCharacter(updated).then(() => {
+        loadCharacters(currentProject!.id);
+        resetResourceForm();
+      });
+    }
   };
 
   const removeResource = (resId: string) => {
@@ -654,38 +688,79 @@ export default function CharactersPage() {
                 <section className={styles.section}>
                   <div className={styles.sectionHeader}>
                     <h3>资源/能力</h3>
-                    <button className="btn btn-sm" onClick={() => setEditingResource(true)}>+ 添加</button>
+                    <button className="btn btn-sm" onClick={() => { resetResourceForm(); setEditingResource(true); }}>+ 添加</button>
                   </div>
-                  {selectedChar.resources.length === 0 ? (
+                  {selectedChar.resources.length === 0 && !editingResource ? (
                     <span className={styles.muted}>暂无记录</span>
                   ) : (
                     <div className={styles.resourceList}>
                       {selectedChar.resources.map((res) => (
                         <div key={res.id} className={styles.resourceItem}>
-                          <div className={styles.resName}>
-                            {res.name}
-                            <span className={styles.resType}>{res.type}</span>
-                            <span className={`${styles.resStatus} ${styles[`resStatus${res.status}`] || ''}`}>
-                              {res.status}
-                            </span>
-                          </div>
-                          {res.description && <div className={styles.resDesc}>{res.description}</div>}
-                          {res.obtainedAt && <div className={styles.resObtained}>📅 {res.obtainedAt}</div>}
-                          {res.cost && <div className={styles.resCost}>💸 代价：{res.cost}</div>}
-                          <button
-                            className="btn btn-sm btn-ghost"
-                            onClick={() => removeResource(res.id)}
-                            style={{ color: 'var(--danger)', fontSize: '11px', marginTop: '4px' }}
-                          >
-                            移除
-                          </button>
+                          {editingResource && editingResourceId === res.id ? (
+                            /* 编辑已有资源的内联表单 */
+                            <div className={styles.inlineForm} style={{ flexDirection: 'column', marginTop: 0 }}>
+                              <input className="input" placeholder="名称" value={resName} onChange={(e) => setResName(e.target.value)} autoFocus />
+                              <div style={{ display: 'flex', gap: '6px' }}>
+                                <select className="select" value={resType} onChange={(e) => setResType(e.target.value as Resource['type'])}>
+                                  <option value="能力">能力</option>
+                                  <option value="物品">物品</option>
+                                  <option value="代价">代价</option>
+                                  <option value="其他">其他</option>
+                                </select>
+                                <select className="select" value={resStatus} onChange={(e) => setResStatus(e.target.value as ResourceStatus)}>
+                                  <option value="未获得">未获得</option>
+                                  <option value="已获得">已获得</option>
+                                  <option value="已消耗">已消耗</option>
+                                  <option value="进行中">进行中</option>
+                                </select>
+                              </div>
+                              <textarea className="textarea" placeholder="描述" value={resDesc} onChange={(e) => setResDesc(e.target.value)} rows={2} />
+                              <input className="input" placeholder="获取时间/章节（可选）" value={resObtainedAt} onChange={(e) => setResObtainedAt(e.target.value)} />
+                              <input className="input" placeholder="代价（可选）" value={resCost} onChange={(e) => setResCost(e.target.value)} />
+                              <div style={{ display: 'flex', gap: '6px' }}>
+                                <button className="btn btn-primary btn-sm" onClick={saveResource}>保存</button>
+                                <button className="btn btn-sm" onClick={resetResourceForm}>取消</button>
+                              </div>
+                            </div>
+                          ) : (
+                            /* 查看模式 */
+                            <>
+                              <div className={styles.resName}>
+                                {res.name}
+                                <span className={styles.resType}>{res.type}</span>
+                                <span className={`${styles.resStatus} ${styles[`resStatus${res.status}`] || ''}`}>
+                                  {res.status}
+                                </span>
+                              </div>
+                              {res.description && <div className={styles.resDesc}>{res.description}</div>}
+                              {res.obtainedAt && <div className={styles.resObtained}>📅 {res.obtainedAt}</div>}
+                              {res.cost && <div className={styles.resCost}>💸 代价：{res.cost}</div>}
+                              <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
+                                <button
+                                  className="btn btn-sm btn-ghost"
+                                  onClick={() => openEditResource(res)}
+                                  style={{ color: 'var(--accent)', fontSize: '11px' }}
+                                >
+                                  编辑
+                                </button>
+                                <button
+                                  className="btn btn-sm btn-ghost"
+                                  onClick={() => removeResource(res.id)}
+                                  style={{ color: 'var(--danger)', fontSize: '11px' }}
+                                >
+                                  移除
+                                </button>
+                              </div>
+                            </>
+                          )}
                         </div>
                       ))}
                     </div>
                   )}
-                  {editingResource && (
+                  {editingResource && !editingResourceId && (
+                    /* 新增资源的内联表单 */
                     <div className={styles.inlineForm} style={{ flexDirection: 'column' }}>
-                      <input className="input" placeholder="名称" value={resName} onChange={(e) => setResName(e.target.value)} />
+                      <input className="input" placeholder="名称" value={resName} onChange={(e) => setResName(e.target.value)} autoFocus />
                       <div style={{ display: 'flex', gap: '6px' }}>
                         <select className="select" value={resType} onChange={(e) => setResType(e.target.value as Resource['type'])}>
                           <option value="能力">能力</option>
@@ -704,8 +779,8 @@ export default function CharactersPage() {
                       <input className="input" placeholder="获取时间/章节（可选）" value={resObtainedAt} onChange={(e) => setResObtainedAt(e.target.value)} />
                       <input className="input" placeholder="代价（可选）" value={resCost} onChange={(e) => setResCost(e.target.value)} />
                       <div style={{ display: 'flex', gap: '6px' }}>
-                        <button className="btn btn-primary btn-sm" onClick={addResource}>确定</button>
-                        <button className="btn btn-sm" onClick={() => setEditingResource(false)}>取消</button>
+                        <button className="btn btn-primary btn-sm" onClick={saveResource}>确定</button>
+                        <button className="btn btn-sm" onClick={resetResourceForm}>取消</button>
                       </div>
                     </div>
                   )}

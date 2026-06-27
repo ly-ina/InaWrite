@@ -89,12 +89,48 @@ export default function ForeshadowsPage() {
     await loadForeshadows(currentProject!.id);
   };
 
-  // 快速切换状态（拖拽到其他列）
+  // 快速切换状态
   const changeStatus = async (id: string, newStatus: Foreshadow['status']) => {
     const f = foreshadows.find((x) => x.id === id);
     if (!f) return;
     await updateForeshadow({ ...f, status: newStatus });
     await loadForeshadows(currentProject!.id);
+  };
+
+  // ===== 拖拽处理 =====
+  const [dragOverCol, setDragOverCol] = useState<string | null>(null);
+
+  const handleDragStart = (e: React.DragEvent, id: string) => {
+    e.dataTransfer.setData('text/plain', id);
+    e.dataTransfer.effectAllowed = 'move';
+    (e.currentTarget as HTMLElement).style.opacity = '0.5';
+  };
+
+  const handleDragEnd = (e: React.DragEvent) => {
+    (e.currentTarget as HTMLElement).style.opacity = '1';
+    setDragOverCol(null);
+  };
+
+  const handleDragOver = (e: React.DragEvent, colKey: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverCol(colKey);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    // 仅在真正离开列时清除
+    if ((e.currentTarget as HTMLElement).contains(e.relatedTarget as HTMLElement)) return;
+    setDragOverCol(null);
+  };
+
+  const handleDrop = async (e: React.DragEvent, newStatus: Foreshadow['status']) => {
+    e.preventDefault();
+    setDragOverCol(null);
+    const id = e.dataTransfer.getData('text/plain');
+    if (!id) return;
+    const f = foreshadows.find((x) => x.id === id);
+    if (!f || f.status === newStatus) return;
+    await changeStatus(id, newStatus);
   };
 
   const toggleSelect = (id: string, list: string[], setter: (v: string[]) => void) => {
@@ -120,7 +156,13 @@ export default function ForeshadowsPage() {
       ) : (
         <div className={styles.kanban}>
           {grouped.map((col) => (
-            <div key={col.key} className={`${styles.column} ${styles[col.className]}`}>
+            <div
+              key={col.key}
+              className={`${styles.column} ${styles[col.className]} ${dragOverCol === col.key ? styles.dragOver : ''}`}
+              onDragOver={(e) => handleDragOver(e, col.key)}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleDrop(e, col.key)}
+            >
               <div className={styles.columnHeader}>
                 <span>{col.label}</span>
                 <span className={styles.count}>{col.items.length}</span>
@@ -130,7 +172,10 @@ export default function ForeshadowsPage() {
                   <div
                     key={f.id}
                     className={`${styles.kanbanCard} ${selectedId === f.id ? styles.selected : ''}`}
+                    draggable
                     onClick={() => setSelectedId(f.id)}
+                    onDragStart={(e) => handleDragStart(e, f.id)}
+                    onDragEnd={handleDragEnd}
                   >
                     <div className={styles.cardContent}>{f.content}</div>
                     <div className={styles.cardMeta}>
@@ -145,7 +190,11 @@ export default function ForeshadowsPage() {
                         </span>
                       )}
                     </div>
-                    {/* 状态切换 */}
+                    {/* 拖拽提示 */}
+                    <div className={styles.dragHandle} title="拖拽到其他列可切换状态">
+                      ⋮⋮
+                    </div>
+                    {/* 状态切换按钮 */}
                     <div className={styles.cardActions}>
                       {COLUMNS.filter((c) => c.key !== f.status).map((c) => (
                         <button
@@ -161,7 +210,7 @@ export default function ForeshadowsPage() {
                   </div>
                 ))}
                 {col.items.length === 0 && (
-                  <div className={styles.emptyColumn}>暂无</div>
+                  <div className={styles.emptyColumn}>拖拽卡片到此处</div>
                 )}
               </div>
             </div>

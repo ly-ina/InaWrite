@@ -43,6 +43,8 @@ export default function WorldSettingsPage() {
   const [editingSetting, setEditingSetting] = useState<WorldSetting | null>(null);
   const [search, setSearch] = useState('');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [viewMode, setViewMode] = useState<'tree' | 'grouped'>('tree');
+  const [filterType, setFilterType] = useState<string>('all');
 
   // 新设定表单
   const [formName, setFormName] = useState('');
@@ -269,9 +271,38 @@ export default function WorldSettingsPage() {
         </div>
       ) : (
       <div className={styles.contentArea}>
-        {/* 左侧树形列表 */}
+        {/* 左侧列表 */}
         <div className={styles.listPanel}>
           <div className={styles.filters}>
+            <div style={{ display: 'flex', gap: '4px', marginBottom: '6px' }}>
+              <button
+                className={`btn btn-sm ${viewMode === 'tree' ? 'btn-primary' : ''}`}
+                onClick={() => setViewMode('tree')}
+                style={{ flex: 1, fontSize: '11px' }}
+              >
+                树形
+              </button>
+              <button
+                className={`btn btn-sm ${viewMode === 'grouped' ? 'btn-primary' : ''}`}
+                onClick={() => setViewMode('grouped')}
+                style={{ flex: 1, fontSize: '11px' }}
+              >
+                分类
+              </button>
+            </div>
+            {viewMode === 'grouped' && (
+              <select
+                className="select"
+                value={filterType}
+                onChange={(e) => setFilterType(e.target.value)}
+                style={{ marginBottom: '6px', fontSize: '12px' }}
+              >
+                <option value="all">全部类型</option>
+                {Object.entries(TYPE_NAMES).map(([k, v]) => (
+                  <option key={k} value={k}>{TYPE_ICONS[k]} {v}</option>
+                ))}
+              </select>
+            )}
             <input
               className="input"
               placeholder="搜索设定..."
@@ -281,7 +312,7 @@ export default function WorldSettingsPage() {
           </div>
           {loading ? (
             <div className="loading-spinner">加载中...</div>
-          ) : filteredTree.length === 0 ? (
+          ) : settings.length === 0 ? (
             <div className="empty-state">
               <div className="icon">🌍</div>
               <p>还没有世界观设定</p>
@@ -289,7 +320,46 @@ export default function WorldSettingsPage() {
                 + 创建第一个设定
               </button>
             </div>
+          ) : viewMode === 'grouped' ? (
+            /* 分组视图 */
+            <div className={styles.groupedList}>
+              {Object.entries(TYPE_NAMES)
+                .filter(([k]) => filterType === 'all' || filterType === k)
+                .map(([typeKey, typeName]) => {
+                  const items = settings
+                    .filter((s) => s.type === typeKey)
+                    .filter((s) => !search || s.name.includes(search) || s.description.includes(search));
+                  if (items.length === 0) return null;
+                  return (
+                    <div key={typeKey} className={styles.groupBlock}>
+                      <div className={styles.groupHeader}>
+                        <span>{TYPE_ICONS[typeKey]} {typeName}</span>
+                        <span className={styles.count}>{items.length}</span>
+                      </div>
+                      {items.map((s) => (
+                        <div
+                          key={s.id}
+                          className={`${styles.treeItem} ${selectedId === s.id ? styles.selected : ''}`}
+                          style={{ paddingLeft: '12px' }}
+                          onClick={() => setSelectedId(s.id)}
+                        >
+                          <span className={styles.expandBtn} style={{ visibility: 'hidden' }}>▸</span>
+                          <span className={styles.treeName}>{s.name}</span>
+                          {s.parentId && (
+                            <span className={styles.parentHint}>{getSettingName(s.parentId)}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
+            </div>
+          ) : filteredTree.length === 0 ? (
+            <div className="empty-state">
+              <p>没有匹配的设定</p>
+            </div>
           ) : (
+            /* 树形视图 */
             <div className={styles.treeList}>
               {filteredTree.map((node) => renderTreeNode(node))}
             </div>

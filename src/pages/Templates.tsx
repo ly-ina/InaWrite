@@ -70,13 +70,13 @@ export default function TemplatesPage() {
     URL.revokeObjectURL(url);
   };
 
-  /** 导入 JSON */
+  /** 导入 JSON（默认覆盖更新） */
   const handleImport = async () => {
     if (!importFile || !currentProject) return;
     setImportStatus('正在导入...');
     try {
       const data = await readJSONFile(importFile);
-      await executeImport(currentProject.id, data, false);
+      await executeImport(currentProject.id, data, true);
       setImportStatus('导入成功！');
       setImportFile(null);
     } catch (error) {
