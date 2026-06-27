@@ -5,3 +5,6 @@ dist/
 .DS_Store
 dist-electron/
 release/
+*.asar
+.codebuddy/
+temp_asar/
