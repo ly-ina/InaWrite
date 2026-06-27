@@ -14,6 +14,7 @@ import ForeshadowsPage from './pages/Foreshadows';
 import WorldSettingsPage from './pages/WorldSettings';
 import ResourcesPage from './pages/Resources';
 import TemplatesPage from './pages/Templates';
+import AIAssistantPage from './pages/AIAssistant';
 import './styles/global.css';
 
 export default function App() {
@@ -41,6 +42,8 @@ export default function App() {
           <Route path="resources" element={<ResourcesPage />} />
           {/* 模板与导入导出 */}
           <Route path="templates" element={<TemplatesPage />} />
+          {/* AI 写作助手 */}
+          <Route path="ai" element={<AIAssistantPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

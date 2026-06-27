@@ -25,6 +25,7 @@ const PROJECT_NAV = [
   { path: '/worldsettings', label: '世界观', icon: '🌍' },
   { path: '/resources', label: '资源', icon: '💎' },
   { path: '/templates', label: '模板', icon: '📦' },
+  { path: '/ai', label: 'AI 助手', icon: '🤖' },
 ];
 
 /** 面包屑路径映射 */
@@ -38,6 +39,7 @@ const BREADCRUMB_MAP: Record<string, string> = {
   '/worldsettings': '世界观设定',
   '/resources': '资源追踪',
   '/templates': '模板与导入导出',
+  '/ai': 'AI 写作助手',
 };
 
 export default function Layout() {

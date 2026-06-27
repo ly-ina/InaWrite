@@ -1,0 +1,348 @@
+.page {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ========== 标签页 ========== */
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.tab {
+  flex: 1;
+  min-width: 160px;
+  padding: 12px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.tab:hover {
+  border-color: var(--border-light);
+}
+
+.tab.active {
+  border-color: var(--accent);
+  background: rgba(201, 169, 110, 0.06);
+}
+
+.tabLabel {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.tabDesc {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.tabContent {
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* ========== 错误提示 ========== */
+.errorBar {
+  display: flex;
+  align-items: center;
+  padding: 10px 14px;
+  background: rgba(196, 75, 75, 0.1);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-sm);
+  color: var(--danger);
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+
+/* ========== 输入区 ========== */
+.inputSection {
+  margin-bottom: 20px;
+}
+
+.inputHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.inputHeader h3 {
+  font-family: var(--font-serif);
+  font-size: 16px;
+  margin: 0;
+}
+
+.textArea {
+  width: 100%;
+  padding: 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.7;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.textArea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* ========== 分析结果 ========== */
+.resultSection {
+  margin-top: 20px;
+}
+
+.resultHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.resultHeader h2 {
+  font-family: var(--font-serif);
+  font-size: 18px;
+  margin: 0;
+}
+
+.applySuccess {
+  padding: 12px 16px;
+  background: rgba(90, 158, 111, 0.1);
+  border: 1px solid var(--success);
+  border-radius: var(--radius-md);
+  color: var(--success);
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+.summaryCard {
+  padding: 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  margin-bottom: 14px;
+}
+
+.summaryTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+
+.summaryCard p {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.sectionCard {
+  margin-bottom: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.sectionTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--bg-card);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+}
+
+.sectionTitle:hover {
+  background: var(--bg-hover);
+}
+
+.itemGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 8px;
+  padding: 12px;
+}
+
+.itemCard {
+  padding: 10px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+}
+
+.itemName {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.itemMeta {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.itemDesc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-top: 4px;
+}
+
+.itemTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.tag {
+  font-size: 10px;
+  padding: 1px 6px;
+  background: rgba(201, 169, 110, 0.12);
+  color: var(--accent);
+  border-radius: 3px;
+}
+
+.muted {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 12px;
+}
+
+/* ========== 伏笔列表 ========== */
+.itemList {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.foreshadowItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+
+.confidence {
+  font-size: 14px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.foreshadowContent {
+  flex: 1;
+  line-height: 1.6;
+}
+
+.foreshadowChars {
+  font-size: 11px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+/* ========== 建议 ========== */
+.suggestionsCard {
+  padding: 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+}
+
+.suggestionsList {
+  margin: 0;
+  padding-left: 1.5em;
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.8;
+}
+
+.suggestionsList li {
+  margin-bottom: 4px;
+}
+
+/* ========== 表单卡片 ========== */
+.formCard {
+  max-width: 700px;
+  padding: 20px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+}
+
+.formCard h3 {
+  font-family: var(--font-serif);
+  font-size: 16px;
+  margin: 0 0 8px;
+}
+
+.hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 14px;
+  line-height: 1.6;
+}
+
+.emptyHint {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+  padding: 20px;
+}
+
+/* ========== Markdown 内容 ========== */
+.markdownCard {
+  padding: 14px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  margin-top: 12px;
+}
+
+.mdContent {
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+}
+
+/* ========== 资源更新项 ========== */
+.resourceUpdateItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+
+/* ========== 配置 ========== */
+.configHint {
+  margin-top: 12px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
