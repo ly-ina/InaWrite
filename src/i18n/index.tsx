@@ -163,10 +163,6 @@ export interface Translations {
   'tpl.fullExport': string;
   'tpl.exportDesc': string;
   'tpl.importData': string;
-  'tpl.presets': string;
-  'tpl.presetsDesc': string;
-  'tpl.usePreset': string;
-  'tpl.presetName': string;
 
   // 搜索
   'search.placeholder': string;
@@ -334,10 +330,6 @@ const zh: Translations = {
   'tpl.fullExport': '📦 完整设定导出',
   'tpl.exportDesc': '导出当前作品的完整数据',
   'tpl.importData': '数据导入',
-  'tpl.presets': '预设模板',
-  'tpl.presetsDesc': '一键创建包含角色、章节、伏笔、世界观设定的完整作品',
-  'tpl.usePreset': '使用模板',
-  'tpl.presetName': '作品名称',
 
   'search.placeholder': '搜索角色、章节、伏笔、设定...',
   'search.noResults': '未找到相关结果',
@@ -501,10 +493,6 @@ const en: Translations = {
   'tpl.fullExport': '📦 Full Export',
   'tpl.exportDesc': 'Export all project data',
   'tpl.importData': 'Data Import',
-  'tpl.presets': 'Preset Templates',
-  'tpl.presetsDesc': 'One-click create a complete project with characters, chapters, and settings',
-  'tpl.usePreset': 'Use Template',
-  'tpl.presetName': 'Project Name',
 
   'search.placeholder': 'Search characters, chapters, foreshadows, settings...',
   'search.noResults': 'No results found',
