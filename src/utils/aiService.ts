@@ -993,3 +993,314 @@ export async function applyResourceUpdates(
 
   return count;
 }
+
+// ========== V4.1 AI 章节续写 ==========
+
+export interface ContinueChapterInput {
+  projectName: string;
+  lastChapterContent: string;    // 上一章内容
+  lastChapterTitle: string;
+  nextChapterOutline?: string;   // 下一章大纲
+  characters: { name: string; description: string; voice?: string }[];
+  activeForeshadows: { content: string }[];
+  styleGuide?: string;           // 写作风格要求
+}
+
+export interface ContinueChapterResult {
+  title: string;
+  content: string;
+  wordCount: number;
+  reasoning: string;             // AI 的写作思路
+}
+
+export async function continueChapter(input: ContinueChapterInput): Promise<ContinueChapterResult> {
+  const charInfo = input.characters.map((c) =>
+    `- ${c.name}：${c.description.slice(0, 80)}${c.voice ? ` [语言风格：${c.voice}]` : ''}`
+  ).join('\n');
+
+  const foreshadowInfo = input.activeForeshadows.map((f) =>
+    `- ${f.content.slice(0, 60)}`
+  ).join('\n');
+
+  const messages: ChatMessage[] = [
+    {
+      role: 'system',
+      content: `你是一位专业小说作家，擅长${input.styleGuide || '多种写作风格'}。根据上一章内容和设定，续写下一章。保持角色语言风格一致，推进伏笔发展。用中文写作。`,
+    },
+    {
+      role: 'user',
+      content: `作品：${input.projectName}
+
+上一章「${input.lastChapterTitle}」内容：
+${input.lastChapterContent.slice(0, 3000)}
+
+角色设定：
+${charInfo}
+
+进行中的伏笔：
+${foreshadowInfo || '无'}
+${input.nextChapterOutline ? `\n下一章大纲：\n${input.nextChapterOutline}` : ''}
+${input.styleGuide ? `\n写作风格要求：${input.styleGuide}` : ''}
+
+请续写下一章，返回 JSON 格式：
+{"title": "章节标题", "content": "正文内容（Markdown格式）", "wordCount": 数字, "reasoning": "写作思路说明（简短）"}
+
+要求：
+1. 保持与前文一致的角色性格和语言风格
+2. 自然推进至少一个伏笔
+3. 章节字数控制在 2000-4000 字
+4. 正文使用 Markdown 格式，段落间空行分隔`,
+    },
+  ];
+
+  const response = await callLLM(messages, 0.7);
+  const jsonStr = extractJSON(response);
+  return JSON.parse(jsonStr) as ContinueChapterResult;
+}
+
+// ========== V4.2 AI 一致性检查 ==========
+
+export interface ConsistencyIssue {
+  type: 'character' | 'timeline' | 'resource' | 'foreshadow' | 'setting';
+  severity: 'error' | 'warning' | 'info';
+  title: string;
+  description: string;
+  location: string;            // 出问题的章节/位置
+  suggestion: string;          // 修复建议
+}
+
+export interface ConsistencyReport {
+  issues: ConsistencyIssue[];
+  summary: string;
+  score: number;               // 一致性评分 0-100
+}
+
+export async function checkConsistency(
+  chapters: { number: number; title: string; summary: string; content?: string }[],
+  characters: { name: string; status: string; description: string }[],
+  foreshadows: { content: string; status: string }[],
+  settings: { name: string; description: string }[]
+): Promise<ConsistencyReport> {
+  const chapterText = chapters.map((ch) =>
+    `第${ch.number}章「${ch.title}」：${(ch.content || ch.summary || '').slice(0, 500)}`
+  ).join('\n\n');
+
+  const charText = characters.map((c) => `- ${c.name}（${c.status}）：${c.description.slice(0, 100)}`).join('\n');
+  const fsText = foreshadows.map((f) => `- [${f.status}] ${f.content.slice(0, 80)}`).join('\n');
+  const settingText = settings.map((s) => `- ${s.name}：${s.description.slice(0, 100)}`).join('\n');
+
+  const messages: ChatMessage[] = [
+    {
+      role: 'system',
+      content: `你是一位小说编辑和设定一致性检查专家。扫描全文，检测设定矛盾、时间线冲突、资源状态不一致等问题。返回 JSON。`,
+    },
+    {
+      role: 'user',
+      content: `请检查以下小说的一致性：
+
+章节内容：
+${chapterText.slice(0, 5000)}
+
+角色状态：
+${charText.slice(0, 1500)}
+
+伏笔状态：
+${fsText.slice(0, 1000)}
+
+世界观设定：
+${settingText.slice(0, 1500)}
+
+请返回 JSON 格式的一致性报告：
+{
+  "issues": [
+    {
+      "type": "character|timeline|resource|foreshadow|setting",
+      "severity": "error|warning|info",
+      "title": "问题简述",
+      "description": "详细描述矛盾之处",
+      "location": "出问题的章节",
+      "suggestion": "修复建议"
+    }
+  ],
+  "summary": "整体一致性评估总结（中文）",
+  "score": 85
+}
+
+检查要点：
+1. 角色状态矛盾（如已死亡角色再次出场）
+2. 时间线冲突（事件先后顺序矛盾）
+3. 资源状态矛盾（已消耗物品再次使用）
+4. 伏笔状态异常（未回收的伏笔在后期未提及）
+5. 世界观设定矛盾（同一定设前后描述不一致）`,
+    },
+  ];
+
+  const response = await callLLM(messages, 0.2);
+  const jsonStr = extractJSON(response);
+  const result = JSON.parse(jsonStr);
+  return {
+    issues: result.issues || [],
+    summary: result.summary || '',
+    score: result.score || 0,
+  };
+}
+
+// ========== V4.3 AI 世界观补全 ==========
+
+export interface WorldCompletionSuggestion {
+  type: 'gap' | 'relation' | 'detail';
+  title: string;
+  description: string;
+  relatedSettings: string[];
+  suggestion: string;
+}
+
+export interface WorldCompletionResult {
+  suggestions: WorldCompletionSuggestion[];
+  summary: string;
+}
+
+export async function completeWorldSettings(
+  settings: { name: string; type: string; description: string; parentName?: string }[]
+): Promise<WorldCompletionResult> {
+  const settingText = settings.map((s) =>
+    `- [${s.type}] ${s.name}${s.parentName ? `（属于：${s.parentName}）` : ''}：${s.description.slice(0, 120)}`
+  ).join('\n');
+
+  const messages: ChatMessage[] = [
+    {
+      role: 'system',
+      content: `你是一位世界观构建专家。根据已有的世界观设定，检测逻辑空白、建议关联关系和补充细节。返回 JSON。`,
+    },
+    {
+      role: 'user',
+      content: `已有世界观设定：
+${settingText.slice(0, 5000)}
+
+请分析并返回 JSON：
+{
+  "suggestions": [
+    {
+      "type": "gap|relation|detail",
+      "title": "建议标题",
+      "description": "详细说明",
+      "relatedSettings": ["相关设定名1", "相关设定名2"],
+      "suggestion": "具体补全建议"
+    }
+  ],
+  "summary": "整体补全建议总结（中文）"
+}
+
+检查要点：
+1. gap - 逻辑空白（如只有"王国"没有"城市"，只有"宗教"没有"神祇"）
+2. relation - 应建立关联但未关联的设定
+3. detail - 需要补充细节的设定`,
+    },
+  ];
+
+  const response = await callLLM(messages, 0.4);
+  const jsonStr = extractJSON(response);
+  const result = JSON.parse(jsonStr);
+  return {
+    suggestions: result.suggestions || [],
+    summary: result.summary || '',
+  };
+}
+
+// ========== V4.4 版本历史（本地实现，不依赖 AI） ==========
+
+export interface DataSnapshot {
+  id: string;
+  projectId: string;
+  timestamp: string;
+  label: string;
+  data: {
+    characters: Character[];
+    chapters: Chapter[];
+    foreshadows: Foreshadow[];
+    worldSettings: WorldSetting[];
+  };
+}
+
+const SNAPSHOT_PREFIX = 'inakb_snapshot_';
+
+/** 创建数据快照 */
+export async function createSnapshot(projectId: string, label?: string): Promise<DataSnapshot> {
+  const characters = await db.characters.getByProject(projectId);
+  const chapters = await db.chapters.getByProject(projectId);
+  const foreshadows = await db.foreshadows.getByProject(projectId);
+  const worldSettings = await db.worldSettings.getByProject(projectId);
+
+  const snapshot: DataSnapshot = {
+    id: generateId(),
+    projectId,
+    timestamp: new Date().toISOString(),
+    label: label || `快照 ${new Date().toLocaleString('zh-CN')}`,
+    data: { characters, chapters, foreshadows, worldSettings },
+  };
+
+  const snapshots = getSnapshots(projectId);
+  snapshots.push(snapshot);
+  // 只保留最近 50 个快照
+  if (snapshots.length > 50) snapshots.shift();
+  localStorage.setItem(`${SNAPSHOT_PREFIX}${projectId}`, JSON.stringify(snapshots));
+
+  return snapshot;
+}
+
+/** 获取所有快照 */
+export function getSnapshots(projectId: string): DataSnapshot[] {
+  try {
+    const raw = localStorage.getItem(`${SNAPSHOT_PREFIX}${projectId}`);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+/** 删除快照 */
+export function deleteSnapshot(projectId: string, snapshotId: string): void {
+  const snapshots = getSnapshots(projectId).filter((s) => s.id !== snapshotId);
+  localStorage.setItem(`${SNAPSHOT_PREFIX}${projectId}`, JSON.stringify(snapshots));
+}
+
+/** 从快照恢复数据 */
+export async function restoreSnapshot(snapshot: DataSnapshot): Promise<void> {
+  const { projectId, data } = snapshot;
+  // 清空旧数据
+  await db.characters.deleteByProject(projectId);
+  await db.chapters.deleteByProject(projectId);
+  await db.foreshadows.deleteByProject(projectId);
+  await db.worldSettings.deleteByProject(projectId);
+  // 写入快照数据
+  if (data.characters.length > 0) await db.characters.addMany(data.characters);
+  if (data.chapters.length > 0) await db.chapters.addMany(data.chapters);
+  if (data.foreshadows.length > 0) await db.foreshadows.addMany(data.foreshadows);
+  if (data.worldSettings.length > 0) await db.worldSettings.addMany(data.worldSettings);
+}
+
+/** 对比两个快照的差异 */
+export function diffSnapshots(a: DataSnapshot, b: DataSnapshot): string {
+  const lines: string[] = [];
+  lines.push(`# 快照对比`);
+  lines.push(`## A: ${a.label}（${new Date(a.timestamp).toLocaleString('zh-CN')}）`);
+  lines.push(`## B: ${b.label}（${new Date(b.timestamp).toLocaleString('zh-CN')}）`);
+  lines.push('');
+
+  const diffCount = (label: string, oldArr: { id: string }[], newArr: { id: string }[]) => {
+    const oldIds = new Set(oldArr.map((x) => x.id));
+    const newIds = new Set(newArr.map((x) => x.id));
+    const added = newArr.filter((x) => !oldIds.has(x.id)).length;
+    const removed = oldArr.filter((x) => !newIds.has(x.id)).length;
+    if (added > 0 || removed > 0) {
+      lines.push(`- ${label}：+${added} / -${removed}`);
+    }
+  };
+
+  diffCount('角色', a.data.characters, b.data.characters);
+  diffCount('章节', a.data.chapters, b.data.chapters);
+  diffCount('伏笔', a.data.foreshadows, b.data.foreshadows);
+  diffCount('世界观设定', a.data.worldSettings, b.data.worldSettings);
+
+  return lines.join('\n');
+}

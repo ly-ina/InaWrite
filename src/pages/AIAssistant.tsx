@@ -15,13 +15,19 @@ import {
   applySelectedResults, applyResourceUpdates,
   analyzeCharacterArc,
   matchAnalysisWithExisting,
+  continueChapter, checkConsistency, completeWorldSettings,
+  createSnapshot, getSnapshots, deleteSnapshot, restoreSnapshot, diffSnapshots,
   type AnalysisResult, type ApplyResult,
   type MatchableAnalysisResult, type MatchableCharacter,
   type MatchableWorldSetting, type MatchableForeshadow,
+  type ContinueChapterInput, type ContinueChapterResult,
+  type ConsistencyIssue, type ConsistencyReport,
+  type WorldCompletionSuggestion, type WorldCompletionResult,
+  type DataSnapshot,
 } from '../utils/aiService';
 import styles from './AIAssistant.module.css';
 
-type TabKey = 'analyze' | 'suggest' | 'resources' | 'settings';
+type TabKey = 'analyze' | 'suggest' | 'resources' | 'continue' | 'consistency' | 'complete' | 'history' | 'settings';
 
 export default function AIAssistantPage() {
   const { currentProject, refreshKey, triggerRefresh } = useAppStore();
@@ -59,6 +65,25 @@ export default function AIAssistantPage() {
   // 角色弧光
   const [arcCharId, setArcCharId] = useState('');
   const [arcResult, setArcResult] = useState('');
+
+  // V4.1 章节续写
+  const [continueChapterId, setContinueChapterId] = useState('');
+  const [continueOutline, setContinueOutline] = useState('');
+  const [continueStyle, setContinueStyle] = useState('');
+  const [continueResult, setContinueResult] = useState<ContinueChapterResult | null>(null);
+
+  // V4.2 一致性检查
+  const [consistencyReport, setConsistencyReport] = useState<ConsistencyReport | null>(null);
+
+  // V4.3 世界观补全
+  const [worldCompletion, setWorldCompletion] = useState<WorldCompletionResult | null>(null);
+
+  // V4.4 版本历史
+  const [snapshots, setSnapshots] = useState<DataSnapshot[]>([]);
+  const [showSnapshotDiff, setShowSnapshotDiff] = useState(false);
+  const [diffA, setDiffA] = useState('');
+  const [diffB, setDiffB] = useState('');
+  const [diffResult, setDiffResult] = useState('');
 
   // 文件上传
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -279,6 +304,133 @@ export default function AIAssistantPage() {
     }
   };
 
+  // ===== V4.1 章节续写 =====
+  const handleContinue = async () => {
+    if (!currentProject || !continueChapterId) return;
+    const lastChapter = chapters.find((c) => c.id === continueChapterId);
+    if (!lastChapter) { setError('请选择上一章'); return; }
+    setLoading(true);
+    setError('');
+    setContinueResult(null);
+    try {
+      const input: ContinueChapterInput = {
+        projectName: currentProject.name,
+        lastChapterContent: lastChapter.content || lastChapter.summary || '',
+        lastChapterTitle: lastChapter.title,
+        nextChapterOutline: continueOutline || undefined,
+        characters: characters.map((c) => ({ name: c.name, description: c.description, voice: c.voice })),
+        activeForeshadows: foreshadows.filter((f) => f.status === 'active').map((f) => ({ content: f.content })),
+        styleGuide: continueStyle || undefined,
+      };
+      const result = await continueChapter(input);
+      setContinueResult(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '续写失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /** 将续写结果保存为章节 */
+  const saveContinuedChapter = async () => {
+    if (!continueResult || !currentProject) return;
+    const nextNumber = chapters.length > 0 ? Math.max(...chapters.map((c) => c.number)) + 1 : 1;
+    await useChapterStore.getState().createChapter({
+      projectId: currentProject.id,
+      number: nextNumber,
+      title: continueResult.title,
+      content: continueResult.content,
+      wordCount: continueResult.wordCount,
+      status: 'draft',
+      characters: [],
+      foreshadowsAdded: [],
+      foreshadowsResolved: [],
+      locations: [],
+      keyEvents: [],
+    });
+    await loadChapters(currentProject.id);
+    triggerRefresh();
+    alert(`已保存为第${nextNumber}章「${continueResult.title}」`);
+  };
+
+  // ===== V4.2 一致性检查 =====
+  const handleConsistencyCheck = async () => {
+    if (!currentProject) return;
+    setLoading(true);
+    setError('');
+    setConsistencyReport(null);
+    try {
+      const report = await checkConsistency(
+        chapters.map((ch) => ({ number: ch.number, title: ch.title, summary: ch.summary || '', content: ch.content })),
+        characters.map((c) => ({ name: c.name, status: c.status, description: c.description })),
+        foreshadows.map((f) => ({ content: f.content, status: f.status })),
+        settings.map((s) => ({ name: s.name, description: s.description })),
+      );
+      setConsistencyReport(report);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '检查失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ===== V4.3 世界观补全 =====
+  const handleWorldComplete = async () => {
+    if (!currentProject) return;
+    setLoading(true);
+    setError('');
+    setWorldCompletion(null);
+    try {
+      const result = await completeWorldSettings(
+        settings.map((s) => ({
+          name: s.name, type: s.type, description: s.description,
+          parentName: s.parentId ? settings.find((p) => p.id === s.parentId)?.name : undefined,
+        })),
+      );
+      setWorldCompletion(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '补全失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ===== V4.4 版本历史 =====
+  const loadSnapshots = () => {
+    if (!currentProject) return;
+    setSnapshots(getSnapshots(currentProject.id));
+  };
+
+  const handleCreateSnapshot = async () => {
+    if (!currentProject) return;
+    const label = prompt('快照标签（可选）：', `手动快照 ${new Date().toLocaleString('zh-CN')}`);
+    await createSnapshot(currentProject.id, label || undefined);
+    loadSnapshots();
+    alert('快照已创建！');
+  };
+
+  const handleRestoreSnapshot = async (snapshot: DataSnapshot) => {
+    if (!confirm(`确定恢复快照「${snapshot.label}」？当前数据将被覆盖。`)) return;
+    await restoreSnapshot(snapshot);
+    triggerRefresh();
+    alert('数据已恢复，页面将刷新。');
+    window.location.reload();
+  };
+
+  const handleDeleteSnapshot = (id: string) => {
+    if (!currentProject || !confirm('删除此快照？')) return;
+    deleteSnapshot(currentProject.id, id);
+    loadSnapshots();
+  };
+
+  const handleDiffSnapshots = () => {
+    if (!diffA || !diffB) return;
+    const a = snapshots.find((s) => s.id === diffA);
+    const b = snapshots.find((s) => s.id === diffB);
+    if (!a || !b) return;
+    setDiffResult(diffSnapshots(a, b));
+  };
+
   if (!currentProject) {
     return <div className="empty-state"><div className="icon">🤖</div><p>请先选择一个作品</p></div>;
   }
@@ -294,7 +446,11 @@ export default function AIAssistantPage() {
         {([
           { key: 'analyze', label: '📖 文本分析', desc: '导入文本，AI 自动提取角色、世界观、伏笔' },
           { key: 'suggest', label: '💡 创作建议', desc: '根据当前进度获取写作指导' },
+          { key: 'continue', label: '✍️ 章节续写', desc: 'AI 根据上一章内容和设定续写下一章' },
           { key: 'resources', label: '🔄 资源追踪', desc: '根据章节内容智能更新角色资源状态' },
+          { key: 'consistency', label: '🔍 一致性检查', desc: '扫描全文检测设定矛盾' },
+          { key: 'complete', label: '🌐 世界观补全', desc: 'AI 根据已有设定推断和补全' },
+          { key: 'history', label: '📜 版本历史', desc: '数据快照与版本管理' },
           { key: 'settings', label: '⚙️ 设置', desc: '配置 API 和模型' },
         ] as const).map((tab) => (
           <button
@@ -617,6 +773,205 @@ export default function AIAssistantPage() {
             )}
             {resourceUpdates.length === 0 && !loading && (
               <div className={styles.emptyHint}>点击扫描检测资源变化</div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ===== V4.1 章节续写 ===== */}
+      {activeTab === 'continue' && (
+        <div className={styles.tabContent}>
+          <div className={styles.formCard}>
+            <h3>✍️ AI 章节续写</h3>
+            <p className={styles.hint}>选择上一章，AI 将根据已有内容、角色设定和进行中的伏笔续写下一章。</p>
+            <div className="form-group">
+              <label>上一章</label>
+              <select className="select" value={continueChapterId} onChange={(e) => setContinueChapterId(e.target.value)}>
+                <option value="">选择章节</option>
+                {[...chapters].sort((a, b) => a.number - b.number).map((ch) => (
+                  <option key={ch.id} value={ch.id}>第{ch.number}章 {ch.title}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>下一章大纲（可选）</label>
+              <textarea className="textarea" value={continueOutline} onChange={(e) => setContinueOutline(e.target.value)}
+                placeholder="简要描述下一章要发生的内容..." rows={3} />
+            </div>
+            <div className="form-group">
+              <label>写作风格要求（可选）</label>
+              <input className="input" value={continueStyle} onChange={(e) => setContinueStyle(e.target.value)}
+                placeholder="如：热血战斗、悬疑推理、轻松日常..." />
+            </div>
+            <button className="btn btn-primary" onClick={handleContinue} disabled={loading || !continueChapterId}>
+              {loading ? '⏳ 续写中...' : '✍️ 开始续写'}
+            </button>
+
+            {continueResult && (
+              <div className={styles.markdownCard} style={{ marginTop: '16px' }}>
+                <div className={styles.summaryTitle}>续写结果 — {continueResult.title}（{continueResult.wordCount}字）</div>
+                <p className={styles.hint}>💡 写作思路：{continueResult.reasoning}</p>
+                <div className={styles.mdContent}>{continueResult.content.slice(0, 2000)}{continueResult.content.length > 2000 ? '...' : ''}</div>
+                <div style={{ marginTop: '12px', display: 'flex', gap: '8px' }}>
+                  <button className="btn btn-primary btn-sm" onClick={saveContinuedChapter}>📖 保存为章节</button>
+                  <button className="btn btn-sm" onClick={() => setContinueResult(null)}>清除</button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ===== V4.2 一致性检查 ===== */}
+      {activeTab === 'consistency' && (
+        <div className={styles.tabContent}>
+          <div className={styles.formCard}>
+            <h3>🔍 AI 一致性检查</h3>
+            <p className={styles.hint}>扫描全部章节、角色、伏笔和世界观设定，检测设定矛盾、时间线冲突等问题。</p>
+            <button className="btn btn-primary" onClick={handleConsistencyCheck} disabled={loading}>
+              {loading ? '⏳ 检查中...' : '🔍 开始检查'}
+            </button>
+
+            {consistencyReport && (
+              <div className={styles.resultSection} style={{ marginTop: '16px' }}>
+                <div className={styles.resultHeader}>
+                  <h3>一致性评分：{consistencyReport.score}/100</h3>
+                </div>
+                <p className={styles.summaryCard} style={{ padding: '10px' }}>
+                  <strong>总结：</strong>{consistencyReport.summary}
+                </p>
+                {consistencyReport.issues.length === 0 ? (
+                  <p className={styles.hint} style={{ textAlign: 'center', padding: '20px' }}>🎉 未发现明显一致性问题！</p>
+                ) : (
+                  <div className={styles.itemList}>
+                    {consistencyReport.issues.map((issue, i) => (
+                      <div key={i} className={styles.matchCard} style={{
+                        borderLeft: `3px solid ${issue.severity === 'error' ? 'var(--danger)' : issue.severity === 'warning' ? 'var(--warning)' : 'var(--text-muted)'}`
+                      }}>
+                        <div className={styles.matchContent}>
+                          <div className={styles.itemName}>
+                            {issue.severity === 'error' ? '🔴' : issue.severity === 'warning' ? '🟡' : '🔵'} {issue.title}
+                            <span className={styles.tag} style={{ marginLeft: '6px' }}>{issue.type}</span>
+                          </div>
+                          <div className={styles.itemDesc}>{issue.description}</div>
+                          <div className={styles.itemMeta}>📍 {issue.location}</div>
+                          <div className={styles.matchHint}>💡 {issue.suggestion}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ===== V4.3 世界观补全 ===== */}
+      {activeTab === 'complete' && (
+        <div className={styles.tabContent}>
+          <div className={styles.formCard}>
+            <h3>🌐 AI 世界观补全</h3>
+            <p className={styles.hint}>AI 分析已有世界观设定，检测逻辑空白、建议关联关系和补充细节。</p>
+            <button className="btn btn-primary" onClick={handleWorldComplete} disabled={loading}>
+              {loading ? '⏳ 分析中...' : '🌐 开始分析'}
+            </button>
+
+            {worldCompletion && (
+              <div className={styles.resultSection} style={{ marginTop: '16px' }}>
+                <p className={styles.summaryCard} style={{ padding: '10px' }}>
+                  <strong>总结：</strong>{worldCompletion.summary}
+                </p>
+                {worldCompletion.suggestions.length === 0 ? (
+                  <p className={styles.hint} style={{ textAlign: 'center', padding: '20px' }}>✅ 现有设定已比较完善</p>
+                ) : (
+                  <div className={styles.itemList}>
+                    {worldCompletion.suggestions.map((sug, i) => (
+                      <div key={i} className={styles.matchCard} style={{
+                        borderLeft: `3px solid ${sug.type === 'gap' ? 'var(--danger)' : sug.type === 'relation' ? 'var(--accent)' : 'var(--text-muted)'}`
+                      }}>
+                        <div className={styles.matchContent}>
+                          <div className={styles.itemName}>
+                            {sug.type === 'gap' ? '🕳' : sug.type === 'relation' ? '🔗' : '📝'} {sug.title}
+                            <span className={styles.tag} style={{ marginLeft: '6px' }}>
+                              {sug.type === 'gap' ? '逻辑空白' : sug.type === 'relation' ? '关联建议' : '细节补充'}
+                            </span>
+                          </div>
+                          <div className={styles.itemDesc}>{sug.description}</div>
+                          <div className={styles.itemMeta}>关联设定：{sug.relatedSettings.join('、')}</div>
+                          <div className={styles.matchHint}>💡 {sug.suggestion}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ===== V4.4 版本历史 ===== */}
+      {activeTab === 'history' && (
+        <div className={styles.tabContent}>
+          <div className={styles.formCard}>
+            <h3>📜 版本历史</h3>
+            <p className={styles.hint}>创建数据快照，随时恢复到任意版本。快照存储在浏览器本地，最多保留 50 个。</p>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
+              <button className="btn btn-primary btn-sm" onClick={handleCreateSnapshot}>📸 创建快照</button>
+              <button className="btn btn-sm" onClick={loadSnapshots}>🔄 刷新列表</button>
+            </div>
+
+            {/* 快照对比 */}
+            <div className="form-group">
+              <label>快照对比</label>
+              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                <select className="select" value={diffA} onChange={(e) => setDiffA(e.target.value)} style={{ flex: 1 }}>
+                  <option value="">选择快照 A</option>
+                  {snapshots.map((s) => (
+                    <option key={s.id} value={s.id}>{s.label}（{new Date(s.timestamp).toLocaleString('zh-CN')}）</option>
+                  ))}
+                </select>
+                <span>vs</span>
+                <select className="select" value={diffB} onChange={(e) => setDiffB(e.target.value)} style={{ flex: 1 }}>
+                  <option value="">选择快照 B</option>
+                  {snapshots.map((s) => (
+                    <option key={s.id} value={s.id}>{s.label}（{new Date(s.timestamp).toLocaleString('zh-CN')}）</option>
+                  ))}
+                </select>
+                <button className="btn btn-sm" onClick={handleDiffSnapshots} disabled={!diffA || !diffB}>对比</button>
+              </div>
+              {diffResult && (
+                <div className={styles.markdownCard} style={{ marginTop: '8px' }}>
+                  <div className={styles.mdContent}>{diffResult}</div>
+                </div>
+              )}
+            </div>
+
+            {/* 快照列表 */}
+            {snapshots.length === 0 ? (
+              <p className={styles.emptyHint}>暂无快照，点击「创建快照」保存当前数据状态</p>
+            ) : (
+              <div className={styles.itemList}>
+                {snapshots.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).map((s) => (
+                  <div key={s.id} className={styles.resourceUpdateItem} style={{ justifyContent: 'space-between' }}>
+                    <div>
+                      <div style={{ fontWeight: 600 }}>{s.label}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                        角色 {s.data.characters.length} · 章节 {s.data.chapters.length} · 伏笔 {s.data.foreshadows.length} · 设定 {s.data.worldSettings.length}
+                      </div>
+                      <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                        {new Date(s.timestamp).toLocaleString('zh-CN')}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      <button className="btn btn-sm" onClick={() => handleRestoreSnapshot(s)}>恢复</button>
+                      <button className="btn btn-sm btn-ghost" style={{ color: 'var(--danger)' }}
+                        onClick={() => handleDeleteSnapshot(s.id)}>删除</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         </div>
