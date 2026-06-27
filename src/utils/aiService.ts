@@ -500,13 +500,30 @@ export async function applySelectedResults(
     if (mw.relations.length > 0) await db.worldSettings.update(setting);
   }
 
-  // 伏笔
+  // 伏笔（角色已全部处理完毕，此时可以解析 relatedCharacters 中的角色名 → ID）
   const existingFShadowContents = new Set(existingForeshadows.map((f) => f.content.trim().toLowerCase()));
   for (const mf of matchResult.foreshadows) {
     if (!mf._selected) continue;
     const key = mf.content.trim().toLowerCase();
     if (!existingFShadowContents.has(key)) {
-      await db.foreshadows.add({ id: generateId(), projectId, content: mf.content, firstAppearance: '', status: 'pending', relatedCharacters: [], notes: `AI 分析置信度：${mf.confidence}` });
+      // 自动解析关联角色名 → ID
+      const resolvedCharIds: string[] = [];
+      if (mf.relatedCharacters?.length) {
+        for (const rcName of mf.relatedCharacters) {
+          const rcKey = rcName.trim().toLowerCase();
+          const rc = charNameMap.get(rcKey);
+          if (rc) resolvedCharIds.push(rc.id);
+        }
+      }
+      await db.foreshadows.add({
+        id: generateId(),
+        projectId,
+        content: mf.content,
+        firstAppearance: '',
+        status: 'pending',
+        relatedCharacters: resolvedCharIds,
+        notes: `AI 分析置信度：${mf.confidence}`,
+      });
       stats.foreshadowsAdded++;
     }
   }
@@ -626,7 +643,8 @@ export async function analyzeNovelText(
 - 如果某个角色在已有角色列表中，请使用已有角色的名字
 - 角色 relations 中 targetName 必须是文本中出现的其他角色名
 - 世界观 relations 中 targetName 必须是文本中出现的其他设定名
-- 伏笔 confidence：high=明确埋设，medium=可能是伏笔，low=仅是暗示
+- **伏笔判断标准必须严格**：只有明确在文本中埋下、暗示未来事件的信息才算伏笔。单纯推进当前剧情的情节、日常对话、场景描写等不应标记为伏笔。confidence 仅「high」和「medium」两档——high=有明显铺垫+留有悬念，medium=对后续情节有轻微暗示。宁缺毋滥，不确定的不要添加。
+- 伏笔的 relatedCharacters 必须填写真实出现在文本中的角色名
 - 如果一个类别没有内容，返回空数组
 - 请用中文回复`,
     },

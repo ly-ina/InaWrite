@@ -29,6 +29,10 @@ export default function ForeshadowsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editingF, setEditingF] = useState<Foreshadow | null>(null);
 
+  // 筛选
+  const [filterChapterId, setFilterChapterId] = useState('');
+  const [filterCharId, setFilterCharId] = useState('');
+
   // 创建表单
   const [formContent, setFormContent] = useState('');
   const [formFirstChapter, setFormFirstChapter] = useState('');
@@ -43,10 +47,16 @@ export default function ForeshadowsPage() {
     }
   }, [currentProject, loadForeshadows, loadCharacters, loadChapters, refreshKey]);
 
-  // 按列分组
+  // 筛选 + 按列分组
+  const filteredForeshadows = foreshadows.filter((f) => {
+    if (filterChapterId && f.firstAppearance !== filterChapterId && f.expectedResolution !== filterChapterId) return false;
+    if (filterCharId && !f.relatedCharacters.includes(filterCharId)) return false;
+    return true;
+  });
+
   const grouped = COLUMNS.map((col) => ({
     ...col,
-    items: foreshadows.filter((f) => f.status === col.key),
+    items: filteredForeshadows.filter((f) => f.status === col.key),
   }));
 
   // 获取名字
@@ -145,9 +155,31 @@ export default function ForeshadowsPage() {
     <div className={styles.page}>
       <div className="page-header">
         <h1>伏笔追踪</h1>
-        <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
-          + 新伏笔
-        </button>
+        <div className="actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <select className="select" value={filterChapterId} onChange={(e) => setFilterChapterId(e.target.value)}
+            style={{ fontSize: '12px', width: '140px' }}>
+            <option value="">全部章节</option>
+            {chapters.map((ch) => (
+              <option key={ch.id} value={ch.id}>第{ch.number}章 {ch.title}</option>
+            ))}
+          </select>
+          <select className="select" value={filterCharId} onChange={(e) => setFilterCharId(e.target.value)}
+            style={{ fontSize: '12px', width: '120px' }}>
+            <option value="">全部角色</option>
+            {characters.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+          {(filterChapterId || filterCharId) && (
+            <button className="btn btn-sm btn-ghost" onClick={() => { setFilterChapterId(''); setFilterCharId(''); }}
+              style={{ fontSize: '11px' }}>
+              清除筛选
+            </button>
+          )}
+          <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
+            + 新伏笔
+          </button>
+        </div>
       </div>
 
       {/* 看板 */}
