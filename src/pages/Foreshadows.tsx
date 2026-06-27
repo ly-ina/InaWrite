@@ -37,7 +37,6 @@ export default function ForeshadowsPage() {
   const [formContent, setFormContent] = useState('');
   const [formFirstChapter, setFormFirstChapter] = useState('');
   const [formRelatedChars, setFormRelatedChars] = useState<string[]>([]);
-  const [formExpectedChapter, setFormExpectedChapter] = useState('');
 
   useEffect(() => {
     if (currentProject) {
@@ -49,7 +48,7 @@ export default function ForeshadowsPage() {
 
   // 筛选 + 按列分组
   const filteredForeshadows = foreshadows.filter((f) => {
-    if (filterChapterId && f.firstAppearance !== filterChapterId && f.expectedResolution !== filterChapterId) return false;
+    if (filterChapterId && f.firstAppearance !== filterChapterId) return false;
     if (filterCharId && !f.relatedCharacters.includes(filterCharId)) return false;
     return true;
   });
@@ -72,7 +71,6 @@ export default function ForeshadowsPage() {
       firstAppearance: formFirstChapter || '',
       status: 'pending',
       relatedCharacters: formRelatedChars,
-      expectedResolution: formExpectedChapter || undefined,
       notes: '',
     });
     await loadForeshadows(currentProject.id);
@@ -80,7 +78,6 @@ export default function ForeshadowsPage() {
     setFormContent('');
     setFormFirstChapter('');
     setFormRelatedChars([]);
-    setFormExpectedChapter('');
   };
 
   // 更新
@@ -285,16 +282,6 @@ export default function ForeshadowsPage() {
                 </select>
               </div>
               <div className="form-group">
-                <label>预计回收章节</label>
-                <select className="select" value={editingF.expectedResolution || ''}
-                  onChange={(e) => setEditingF({ ...editingF, expectedResolution: e.target.value || undefined })}>
-                  <option value="">未选择</option>
-                  {chapters.map((ch) => (
-                    <option key={ch.id} value={ch.id}>第{ch.number}章 {ch.title}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="form-group">
                 <label>补充说明</label>
                 <textarea className="textarea" value={editingF.notes || ''}
                   onChange={(e) => setEditingF({ ...editingF, notes: e.target.value })} rows={3} />
@@ -327,12 +314,6 @@ export default function ForeshadowsPage() {
                 <div className="form-group">
                   <label>首次出现</label>
                   <p style={{ fontSize: '14px' }}>{getChapterTitle(f.firstAppearance)}</p>
-                </div>
-              )}
-              {f.expectedResolution && (
-                <div className="form-group">
-                  <label>预计回收</label>
-                  <p style={{ fontSize: '14px' }}>{getChapterTitle(f.expectedResolution)}</p>
                 </div>
               )}
               {f.relatedCharacters.length > 0 && (
@@ -387,16 +368,6 @@ export default function ForeshadowsPage() {
                   </label>
                 ))}
               </div>
-            </div>
-            <div className="form-group">
-              <label>预计回收章节</label>
-              <select className="select" value={formExpectedChapter}
-                onChange={(e) => setFormExpectedChapter(e.target.value)}>
-                <option value="">未选择</option>
-                {chapters.map((ch) => (
-                  <option key={ch.id} value={ch.id}>第{ch.number}章 {ch.title}</option>
-                ))}
-              </select>
             </div>
             <div className="form-actions">
               <button className="btn" onClick={() => setShowCreate(false)}>取消</button>
