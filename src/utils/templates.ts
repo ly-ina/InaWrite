@@ -45,7 +45,7 @@ import { generateId } from '../types';
  */
 export function getCharacterTemplate(projectId: string): Character[] {
   return [{
-    id: generateId(),
+    id: '<自动生成>',               // 留空或填已有 ID 以覆盖，不填则自动生成
     projectId,
     name: '',                       // 【必填】角色名
     aliases: [],                    // 别名列表，如 ["绰号1", "绰号2"]
@@ -70,7 +70,7 @@ export function getCharacterTemplate(projectId: string): Character[] {
     ],
     resources: [
       {
-        id: generateId(),
+        id: '<自动生成>',
         name: '',                   // 名称
         type: '能力',               // 能力/物品/代价/其他
         description: '',            // 描述
@@ -100,7 +100,7 @@ export function getCharacterTemplate(projectId: string): Character[] {
  */
 export function getChapterTemplate(projectId: string): Chapter[] {
   return [{
-    id: generateId(),
+    id: '<自动生成>',
     projectId,
     number: 1,                      // 章节序号
     title: '',                      // 【必填】章节标题
@@ -128,7 +128,7 @@ export function getChapterTemplate(projectId: string): Chapter[] {
  */
 export function getForeshadowTemplate(projectId: string): Foreshadow[] {
   return [{
-    id: generateId(),
+    id: '<自动生成>',
     projectId,
     content: '',                    // 【必填】伏笔内容
     firstAppearance: '',            // 首次出现章节 ID
@@ -153,7 +153,7 @@ export function getForeshadowTemplate(projectId: string): Foreshadow[] {
  */
 export function getWorldSettingTemplate(projectId: string): WorldSetting[] {
   return [{
-    id: generateId(),
+    id: '<自动生成>',
     projectId,
     name: '',                       // 【必填】设定名称
     type: 'location',               // location=地点 | race=种族 | item=物品 | concept=概念 | history=历史 | custom=自定义

@@ -141,21 +141,54 @@ export async function detectConflicts(
  * @param importData - 要导入的数据
  * @param overwrite - 冲突时是否覆盖（true=覆盖, false=跳过）
  */
+/** 占位符 ID 模式，导入时自动替换为新 ID */
+const PLACEHOLDER_ID = '<自动生成>';
+
+function replacePlaceholderIds<T extends { id: string }>(items: T[], generate: () => string): T[] {
+  return items.map((item) => ({
+    ...item,
+    id: item.id === PLACEHOLDER_ID || !item.id ? generate() : item.id,
+  }));
+}
+
 export async function executeImport(
   projectId: string,
   importData: ProjectExport,
   overwrite: boolean
 ): Promise<void> {
-  // 更新所有导入数据中的 projectId 为目标项目
-  const characters = importData.characters.map((c) => ({ ...c, projectId }));
-  const chapters = importData.chapters.map((c) => ({ ...c, projectId }));
-  const foreshadows = importData.foreshadows.map((f) => ({ ...f, projectId }));
-  const worldSettings = importData.worldSettings.map((w) => ({ ...w, projectId }));
+  // 替换占位符 ID 为自动生成的 ID
+  const characters = replacePlaceholderIds(
+    importData.characters.map((c) => ({ ...c, projectId })),
+    () => Date.now().toString(36) + Math.random().toString(36).slice(2, 9)
+  );
+  const chapters = replacePlaceholderIds(
+    importData.chapters.map((c) => ({ ...c, projectId })),
+    () => Date.now().toString(36) + Math.random().toString(36).slice(2, 9)
+  );
+  const foreshadows = replacePlaceholderIds(
+    importData.foreshadows.map((f) => ({ ...f, projectId })),
+    () => Date.now().toString(36) + Math.random().toString(36).slice(2, 9)
+  );
+  const worldSettings = replacePlaceholderIds(
+    importData.worldSettings.map((w) => ({ ...w, projectId })),
+    () => Date.now().toString(36) + Math.random().toString(36).slice(2, 9)
+  );
+
+  // 替换角色内嵌 resource 的占位符 ID
+  const finalChars = characters.map((c) => ({
+    ...c,
+    resources: c.resources.map((r) => ({
+      ...r,
+      id: r.id === PLACEHOLDER_ID || !r.id
+        ? Date.now().toString(36) + Math.random().toString(36).slice(2, 9)
+        : r.id,
+    })),
+  }));
 
   if (overwrite) {
     // 覆盖模式：直接写入
     await Promise.all([
-      db.characters.addMany(characters),
+      db.characters.addMany(finalChars),
       db.chapters.addMany(chapters),
       db.foreshadows.addMany(foreshadows),
       db.worldSettings.addMany(worldSettings),
@@ -167,7 +200,7 @@ export async function executeImport(
     const existingForeshadowIds = new Set((await db.foreshadows.getByProject(projectId)).map((f) => f.id));
     const existingSettingIds = new Set((await db.worldSettings.getByProject(projectId)).map((s) => s.id));
 
-    const newChars = characters.filter((c) => !existingCharIds.has(c.id));
+    const newChars = finalChars.filter((c) => !existingCharIds.has(c.id));
     const newChapters = chapters.filter((c) => !existingChapterIds.has(c.id));
     const newForeshadows = foreshadows.filter((f) => !existingForeshadowIds.has(f.id));
     const newSettings = worldSettings.filter((w) => !existingSettingIds.has(w.id));
