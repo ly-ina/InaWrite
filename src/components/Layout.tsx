@@ -23,6 +23,7 @@ const PROJECT_NAV = [
   { path: '/foreshadows', label: '伏笔', icon: '🔮' },
   { path: '/worldsettings', label: '世界观', icon: '🌍' },
   { path: '/resources', label: '资源', icon: '💎' },
+  { path: '/templates', label: '模板', icon: '📦' },
 ];
 
 /** 面包屑路径映射 */
@@ -35,6 +36,7 @@ const BREADCRUMB_MAP: Record<string, string> = {
   '/timeline': '章节时间线',
   '/worldsettings': '世界观设定',
   '/resources': '资源追踪',
+  '/templates': '模板与导入导出',
 };
 
 export default function Layout() {

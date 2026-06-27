@@ -21,6 +21,7 @@ const QUICK_ACTIONS = [
   { label: '新章节', icon: '📖', path: '/chapters' },
   { label: '新伏笔', icon: '🔮', path: '/foreshadows' },
   { label: '新设定', icon: '🌍', path: '/worldsettings' },
+  { label: '模板', icon: '📦', path: '/templates' },
 ];
 
 export default function DashboardPage() {

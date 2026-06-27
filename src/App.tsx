@@ -13,6 +13,7 @@ import TimelinePage from './pages/Timeline';
 import ForeshadowsPage from './pages/Foreshadows';
 import WorldSettingsPage from './pages/WorldSettings';
 import ResourcesPage from './pages/Resources';
+import TemplatesPage from './pages/Templates';
 import './styles/global.css';
 
 export default function App() {
@@ -38,6 +39,8 @@ export default function App() {
           <Route path="worldsettings" element={<WorldSettingsPage />} />
           {/* 资源追踪 */}
           <Route path="resources" element={<ResourcesPage />} />
+          {/* 模板与导入导出 */}
+          <Route path="templates" element={<TemplatesPage />} />
         </Route>
       </Routes>
     </BrowserRouter>
