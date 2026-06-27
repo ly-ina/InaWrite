@@ -402,34 +402,63 @@ body {
     --header-height: 44px;
   }
 
+  html {
+    font-size: 14px;
+  }
+
   body {
     font-size: 14px;
     -webkit-tap-highlight-color: transparent;
     overscroll-behavior: none;
+    overflow: hidden;
   }
 
-  /* 侧边栏在移动端变为底部标签栏 */
+  #app {
+    height: 100vh;
+    height: 100dvh;
+  }
+
+  /* ===== 布局改为纵向 ===== */
   .layout {
-    flex-direction: column;
+    flex-direction: column !important;
   }
 
+  /* ===== 侧边栏 → 固定在顶部（可滚动横向标签） ===== */
   .sidebar {
-    position: fixed;
-    bottom: 0;
+    position: sticky;
+    top: 0;
     left: 0;
     right: 0;
     z-index: 100;
     width: 100% !important;
     min-width: 100% !important;
-    height: 56px;
-    flex-direction: row;
-    border-right: none;
-    border-top: 1px solid var(--border-color);
+    height: auto;
+    flex-direction: column;
+    border-right: none !important;
+    border-bottom: 1px solid var(--border-color);
     background: var(--bg-secondary);
+    flex-shrink: 0;
   }
 
-  .sidebarHeader, .projectInfo, .backBtn, .sidebarFooter {
+  .sidebar.collapsed {
+    width: 100% !important;
+    min-width: 100% !important;
+    height: auto;
+  }
+
+  .sidebarHeader {
     display: none !important;
+  }
+
+  .projectInfo {
+    display: none !important;
+  }
+
+  .backBtn {
+    display: flex !important;
+    padding: 6px 12px;
+    font-size: 12px;
+    border-bottom: 1px solid var(--border-color);
   }
 
   .nav {
@@ -437,87 +466,181 @@ body {
     flex-direction: row;
     width: 100%;
     overflow-x: auto;
+    overflow-y: hidden;
     gap: 0;
+    padding: 4px 4px;
+    flex: none;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .nav::-webkit-scrollbar {
+    display: none;
   }
 
   .navItem {
-    flex: 1;
+    flex: 0 0 auto;
     min-width: 0;
-    padding: 4px 2px;
+    padding: 6px 10px;
     justify-content: center;
-    font-size: 10px;
-    border-radius: 0;
+    font-size: 12px;
+    border-radius: var(--radius-sm);
+    white-space: nowrap;
+    gap: 4px;
   }
 
   .navLabel {
-    font-size: 10px;
+    font-size: 11px;
     line-height: 1.2;
   }
 
   .navIcon {
-    font-size: 18px;
+    font-size: 16px;
     margin-right: 0 !important;
+    width: auto;
   }
 
+  /* ===== 底部工具栏：导入/导出/主题/语言 ===== */
+  .sidebarFooter {
+    display: flex !important;
+    flex-direction: row;
+    gap: 4px;
+    padding: 4px 6px;
+    border-top: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border-color);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-shrink: 0;
+  }
+
+  .sidebarFooter .themeToggle {
+    flex: 0 0 auto;
+    width: auto;
+    padding: 5px 10px;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+
+  .sidebarFooter > div[style] {
+    display: none;
+  }
+
+  /* ===== 主内容区 ===== */
   .mainWrapper {
-    padding-bottom: 60px;
-    height: 100vh;
+    flex: 1;
+    height: auto;
     overflow-y: auto;
+    overflow-x: hidden;
+    padding-bottom: 0;
+    -webkit-overflow-scrolling: touch;
   }
 
   .breadcrumb {
-    padding: 8px 12px;
-    font-size: 12px;
+    padding: 6px 12px;
+    font-size: 11px;
+    height: 30px;
+    flex-shrink: 0;
   }
 
+  .main {
+    padding: 12px 10px;
+  }
+
+  /* ===== 页面标题 ===== */
   .page-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-    padding: 10px 12px;
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 0 0 10px 0;
   }
 
   .page-header h1 {
-    font-size: 18px;
+    font-size: 17px;
+    flex: 1;
+    min-width: 0;
   }
 
-  .actions {
-    width: 100%;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
+  .page-header .actions,
+  .page-header > .btn {
+    flex-shrink: 0;
   }
 
+  /* ===== 双栏布局 → 纵向折叠 ===== */
   .contentArea {
     flex-direction: column !important;
+    height: auto !important;
   }
 
   .listPanel {
     width: 100% !important;
-    max-height: 200px;
+    min-width: 100% !important;
+    max-height: 40vh;
     border-right: none !important;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 2px solid var(--border-color);
+    flex-shrink: 0;
   }
 
   .detailPanel {
     width: 100% !important;
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 10px !important;
+  }
+
+  .detailContent {
+    max-width: 100% !important;
+  }
+
+  .detailHeader {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  /* ===== 模态框 ===== */
+  .modal-overlay {
+    align-items: flex-end;
   }
 
   .modal {
     min-width: auto !important;
-    width: 92vw !important;
+    width: 100vw !important;
+    max-width: 100vw !important;
     max-height: 85vh;
     padding: 16px;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    margin: 0;
   }
 
   .modal h2 {
     font-size: 16px;
+    margin-bottom: 14px;
   }
 
-  .cardGrid, .projectGrid {
+  .modal .form-actions {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .modal .form-actions .btn {
+    flex: 1;
+    min-width: 80px;
+    justify-content: center;
+  }
+
+  /* ===== 卡片网格 ===== */
+  .cardGrid, .projectGrid, .grid {
     grid-template-columns: 1fr !important;
   }
 
+  /* ===== 作品卡片 ===== */
+  .projectCard .cardCover {
+    height: 100px;
+  }
+
+  .projectCard .cardActions {
+    flex-wrap: wrap;
+  }
+
+  /* ===== 表单 ===== */
   .form-group {
     margin-bottom: 10px;
   }
@@ -537,23 +660,113 @@ body {
     font-size: 11px;
   }
 
+  /* ===== 标签页 ===== */
   .tabs {
-    flex-direction: column;
+    flex-direction: row;
+    flex-wrap: wrap;
     gap: 4px;
+    overflow-x: auto;
   }
 
   .tab {
-    width: 100%;
-    text-align: left;
-    padding: 10px;
+    flex: 0 0 auto;
+    text-align: center;
+    padding: 8px 12px;
+    font-size: 13px;
+    white-space: nowrap;
   }
 
+  /* ===== 看板 ===== */
   .kanban {
     flex-direction: column;
+    overflow-x: auto;
   }
 
   .kanbanColumn {
     width: 100% !important;
+    min-width: 100% !important;
     margin-bottom: 12px;
+  }
+
+  /* ===== Dashboard 统计卡片 ===== */
+  .statsGrid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px;
+  }
+
+  .statCard {
+    padding: 12px 10px;
+  }
+  .statCard .statValue {
+    font-size: 20px;
+  }
+
+  .hero {
+    padding: 10px 0;
+  }
+  .hero .title {
+    font-size: 22px;
+  }
+
+  .quickActions {
+    gap: 6px;
+  }
+  .quickBtn {
+    flex: 1 1 calc(50% - 6px);
+    min-width: 0;
+    font-size: 12px;
+    padding: 10px 8px;
+  }
+
+  /* ===== 大纲编辑器 ===== */
+  .outlineEditor {
+    flex-direction: column !important;
+  }
+
+  /* ===== 关系图谱 ===== */
+  .graphSection {
+    height: 60vh !important;
+  }
+
+  /* ===== 角色详情内联表单 ===== */
+  .inlineForm {
+    flex-wrap: wrap;
+  }
+  .inlineForm .input,
+  .inlineForm .select {
+    flex: 1 1 100px;
+  }
+
+  /* ===== 搜索/过滤栏 ===== */
+  .filters {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 6px;
+  }
+  .filters .input {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  /* ===== 章节编辑器 ===== */
+  .chapterEditor {
+    flex-direction: column !important;
+  }
+  .chapterEditor .editorPane,
+  .chapterEditor .previewPane {
+    width: 100% !important;
+  }
+
+  /* ===== Markdown 编辑器 ===== */
+  .markdownEditor {
+    min-height: 200px;
+  }
+
+  /* ===== 确保可滚动区域正常工作 ===== */
+  .charList,
+  .chapterList,
+  .outlineList {
+    max-height: 35vh;
   }
 }

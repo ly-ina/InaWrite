@@ -9,7 +9,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/状态-活跃开发-brightgreen" alt="status" />
-  <img src="https://img.shields.io/badge/平台-Web%20|%20桌面-blue" alt="platform" />
+  <img src="https://img.shields.io/badge/平台-Web%20|%20桌面%20|%20Android-blue" alt="platform" />
   <img src="https://img.shields.io/badge/AI-OpenAI%20兼容-orange" alt="ai" />
 </p>
 
@@ -27,6 +27,7 @@
 - 📦 **灵活导入** — 支持 JSON 数组/单对象/完整导出三种格式，智能按名称匹配更新
 - 🔗 **关联管理** — 角色关系图谱、章节与伏笔追踪、世界观设定层级树与关联图谱
 - ⌨️ **键盘友好** — Ctrl+K 全局搜索、Ctrl+Z/Y 撤销重做、快捷键操作
+- 📱 **全平台覆盖** — Web 浏览器、Windows/Mac/Linux 桌面应用、Android APK
 
 ---
 
@@ -135,6 +136,11 @@ novel-kb/
 │   ├── App.tsx                # 路由配置
 │   ├── main.tsx               # 应用入口
 │   └── vite-env.d.ts          # Vite 类型声明
+├── electron/               # Electron 桌面应用
+│   ├── main.ts              # 主进程（窗口/托盘/IPC/自动保存/崩溃恢复）
+│   └── preload.ts           # 预加载脚本（contextBridge）
+├── android/                 # Android 项目（Capacitor）
+│   └── app/                 # Android 应用源码
 ├── index.html
 ├── vite.config.ts
 ├── tsconfig.json
@@ -383,10 +389,17 @@ Novel InaKB 内置 AI 写作助手，支持两种协作方式：
   - IndexedDB 数据持久化，关窗再开数据不丢失
   - HashRouter 路由，file:// 协议完美支持
   - 侧边栏 📤 导出作品 / 📥 导入作品
-- [ ] **移动端适配**：PWA 离线可用
-  - 响应式布局适配手机/平板
-  - 离线数据同步
-  - 语音输入记录灵感
+- [x] **移动端适配**：响应式布局 + Android APK
+  - 顶部横向可滚动导航标签栏（11 个模块）
+  - 底部工具栏：导入/导出/主题切换/中英文切换
+  - 双栏布局自动转为上下排列（列表 35vh + 详情区）
+  - 模态框底部弹出（类似 iOS ActionSheet）
+  - Dashboard 统计卡片 3 列网格自适应
+  - 看板/大纲/时间线纵向排列适配
+  - 输入框 16px 字体防止 iOS 自动缩放
+  - 100dvh 动态视口高度适配浏览器地址栏
+  - **Android APK 打包**：Capacitor 构建，debug APK 约 4.8MB
+  - PWA manifest + Service Worker 离线可用
 - [ ] **云同步增强**：支持更多云存储后端
   - OneDrive / Google Drive / Dropbox
   - 端到端加密

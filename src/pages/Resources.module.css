@@ -275,3 +275,52 @@
 .charLink:hover {
   text-decoration: underline;
 }
+
+/* ========== 移动端适配 ========== */
+@media (max-width: 768px) {
+  .contentArea {
+    flex-direction: column;
+    height: auto;
+  }
+
+  .listPanel {
+    width: 100%;
+    min-width: 100%;
+    max-height: 30vh;
+    border-right: none;
+    border-bottom: 2px solid var(--border-color);
+  }
+
+  .detailPanel {
+    width: 100%;
+    padding: 10px;
+  }
+
+  .detailContent {
+    max-width: 100%;
+  }
+
+  .globalView {
+    overflow-y: visible;
+  }
+
+  .globalFilters {
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+
+  .tableHeader,
+  .tableRow {
+    padding: 8px 10px;
+    font-size: 12px;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .colName { flex: 1 1 100%; }
+  .colType { flex: 0 0 auto; }
+  .colChar { flex: 0 0 auto; }
+  .colStatus { flex: 0 0 auto; }
+  .colCost { flex: 0 0 auto; }
+}

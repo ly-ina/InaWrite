@@ -178,3 +178,75 @@
   border: 1px dashed var(--border-color);
   border-radius: var(--radius-md);
 }
+
+/* ========== 移动端适配 ========== */
+@media (max-width: 768px) {
+  .page {
+    height: auto;
+  }
+
+  .contentArea {
+    flex-direction: column;
+    height: auto;
+    gap: 0;
+  }
+
+  .listPanel {
+    width: 100%;
+    min-width: 100%;
+    max-height: 35vh;
+    border-right: none;
+    border-bottom: 2px solid var(--border-color);
+    flex-shrink: 0;
+  }
+
+  .chapterList {
+    max-height: none;
+  }
+
+  .detailPanel {
+    width: 100%;
+    padding: 10px;
+    overflow-y: visible;
+  }
+
+  .detailContent {
+    max-width: 100%;
+  }
+
+  .detailHeader {
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+  }
+
+  .section {
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+  }
+
+  .section h3 {
+    font-size: 14px;
+  }
+
+  .contentPreview {
+    font-size: 14px;
+    line-height: 1.8;
+    padding: 12px;
+    max-height: 60vh;
+  }
+
+  .summary {
+    font-size: 13px;
+  }
+
+  .chapterItem {
+    padding: 8px 10px;
+    gap: 6px;
+  }
+
+  .chTitle {
+    font-size: 13px;
+  }
+}

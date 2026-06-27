@@ -166,8 +166,8 @@ export default function Layout() {
           </button>
         </div>
 
-        {/* 返回作品列表按钮（在项目内时显示） */}
-        {isInProject && !sidebarCollapsed && (
+        {/* 返回作品列表按钮（在项目内时显示，移动端始终显示） */}
+        {isInProject && (
           <button className={styles.backBtn} onClick={handleBackToProjects}>
             ← 返回作品列表
           </button>

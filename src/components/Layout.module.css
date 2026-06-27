@@ -77,6 +77,17 @@
   color: var(--accent);
 }
 
+/* 移动端：返回按钮始终可见 */
+@media (max-width: 768px) {
+  .backBtn {
+    display: flex !important;
+    padding: 8px 12px;
+    font-size: 13px;
+    border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
+  }
+}
+
 .projectInfo {
   padding: 10px 12px;
   border-bottom: 1px solid var(--border-color);

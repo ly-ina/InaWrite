@@ -478,3 +478,65 @@
   line-height: 1.7;
   margin: 0;
 }
+
+/* ========== 移动端适配 ========== */
+@media (max-width: 768px) {
+  .contentArea {
+    flex-direction: column;
+    height: auto;
+  }
+
+  .listPanel {
+    width: 100%;
+    min-width: 100%;
+    max-height: 30vh;
+    border-right: none;
+    border-bottom: 2px solid var(--border-color);
+  }
+
+  .detailPanel {
+    width: 100%;
+    padding: 10px;
+  }
+
+  .arcView {
+    overflow-y: visible;
+  }
+
+  .arcSelector {
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+  }
+
+  .arcTimeline {
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px 0;
+    overflow-x: visible;
+  }
+
+  .arcLine {
+    display: none;
+  }
+
+  .arcNode {
+    width: 100%;
+    padding-top: 0;
+  }
+
+  .arcNodeLine {
+    display: none;
+  }
+
+  .arcNodeContent {
+    margin: 0;
+  }
+
+  .arcSummary {
+    width: 100%;
+    margin: 8px 0;
+    margin-top: 8px;
+  }
+}

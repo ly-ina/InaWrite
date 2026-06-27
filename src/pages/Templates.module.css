@@ -85,3 +85,35 @@
 }
 .importStatus.success { color: var(--success); }
 .importStatus.error { color: var(--danger); }
+
+/* ========== 移动端适配 ========== */
+@media (max-width: 768px) {
+  .tplItem {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .tplInfo {
+    gap: 8px;
+  }
+
+  .tplIcon {
+    font-size: 18px;
+  }
+
+  .tplName {
+    font-size: 13px;
+  }
+
+  .exportActions {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .importArea {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+}
