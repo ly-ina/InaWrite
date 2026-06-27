@@ -3,7 +3,7 @@
  * 显示章节列表，支持增删改查、正文编辑、字数统计、草稿功能
  */
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useChapterStore } from '../store/chapterStore';
@@ -57,6 +57,21 @@ export default function ChaptersPage() {
   const [draftContent, setDraftContent] = useState('');
   const [draftTitle, setDraftTitle] = useState('');
   const [draftWordCount, setDraftWordCount] = useState(0);
+  const draftFileRef = useRef<HTMLInputElement>(null);
+
+  /** 从文件导入草稿内容 */
+  const handleDraftFileImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const text = (ev.target?.result as string) || '';
+      setDraftContent((prev) => prev ? prev + '\n\n' + text : text);
+      setDraftWordCount(countChineseWords(draftContent + (draftContent ? '\n\n' : '') + text));
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
 
   useEffect(() => {
     if (currentProject) {
@@ -452,7 +467,11 @@ export default function ChaptersPage() {
             display: 'flex', flexDirection: 'column',
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-              <h2 style={{ margin: 0 }}>✍️ 草稿 — {draftTitle}</h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <h2 style={{ margin: 0 }}>✍️ 草稿 — {draftTitle}</h2>
+                <button className="btn btn-sm" onClick={() => draftFileRef.current?.click()}>📁 导入文件</button>
+                <input ref={draftFileRef} type="file" accept=".txt,.md" style={{ display: 'none' }} onChange={handleDraftFileImport} />
+              </div>
               <span style={{ fontSize: '13px', color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>
                 {draftWordCount.toLocaleString()} 字
               </span>
