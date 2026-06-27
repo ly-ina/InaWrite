@@ -1,0 +1,204 @@
+.page {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+/* ========== Hero 区域 ========== */
+.hero {
+  margin-bottom: 32px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.title {
+  font-family: var(--font-serif);
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.desc {
+  font-size: 15px;
+  color: var(--text-secondary);
+  line-height: 1.7;
+  margin-bottom: 8px;
+}
+
+.meta {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ========== 分区 ========== */
+.section {
+  margin-bottom: 28px;
+}
+
+.section h3 {
+  font-family: var(--font-serif);
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 14px;
+  color: var(--text-primary);
+}
+
+/* ========== 统计卡片 ========== */
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.statCard {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  text-align: center;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.statCard:hover {
+  border-color: var(--border-light);
+  box-shadow: var(--shadow-sm);
+}
+
+.statIcon {
+  font-size: 24px;
+  margin-bottom: 6px;
+}
+
+.statValue {
+  font-size: 24px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  margin-bottom: 2px;
+}
+
+.statLabel {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ========== 快捷操作 ========== */
+.quickActions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.quickBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.quickBtn:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent);
+  box-shadow: var(--shadow-sm);
+}
+
+.quickIcon {
+  font-size: 18px;
+}
+
+/* ========== 进度条 ========== */
+.progressBar {
+  height: 8px;
+  background: var(--bg-hover);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--success);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.progressText {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+}
+
+/* ========== 章节预览 ========== */
+.chapterPreview {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.chapterItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+
+.chNum {
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.chTitle {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chWords {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* ========== 最近动态 ========== */
+.activityList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.activityItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  font-size: 13px;
+}
+
+.activityDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+}
+
+.activityLabel {
+  flex: 1;
+  color: var(--text-secondary);
+}
+
+.activityTime {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
