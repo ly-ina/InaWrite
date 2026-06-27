@@ -18,7 +18,10 @@
     "electron:build:win": "tsc && vite build && tsc -p electron/tsconfig.json && electron-builder --win",
     "electron:build:mac": "tsc && vite build && tsc -p electron/tsconfig.json && electron-builder --mac",
     "electron:build:linux": "tsc && vite build && tsc -p electron/tsconfig.json && electron-builder --linux",
-    "electron:build:all": "tsc && vite build && tsc -p electron/tsconfig.json && electron-builder --win --mac --linux"
+    "electron:build:all": "tsc && vite build && tsc -p electron/tsconfig.json && electron-builder --win --mac --linux",
+    "android:sync": "vite build && npx cap sync android",
+    "android:open": "npx cap open android",
+    "android:build": "vite build && npx cap sync android && cd android && gradlew assembleDebug"
   },
   "devDependencies": {
     "@types/file-saver": "^2.0.7",
@@ -37,6 +40,9 @@
     "electron-builder": "^26.0.12"
   },
   "dependencies": {
+    "@capacitor/android": "^8.4.1",
+    "@capacitor/cli": "^8.4.1",
+    "@capacitor/core": "^8.4.1",
     "@types/d3": "^7.4.3",
     "d3": "^7.9.0",
     "docx": "^9.7.1",

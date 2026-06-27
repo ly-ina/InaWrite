@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Novel InaKB</string>
+    <string name="title_activity_main">Novel InaKB</string>
+    <string name="package_name">com.inakb.novel</string>
+    <string name="custom_url_scheme">com.inakb.novel</string>
+</resources>

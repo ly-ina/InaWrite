@@ -8,3 +8,10 @@ release/
 *.asar
 .codebuddy/
 temp_asar/
+android/capacitor-cordova-android-plugins/
+android/app/build/
+android/.gradle/
+android/build/
+android/captures/
+*.apk
+*.aab

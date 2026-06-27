@@ -394,3 +394,166 @@ body {
 .tooltip:hover::after {
   opacity: 1;
 }
+
+/* ========== 移动端响应式 ========== */
+@media (max-width: 768px) {
+  :root {
+    --sidebar-width: 0px;
+    --header-height: 44px;
+  }
+
+  body {
+    font-size: 14px;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior: none;
+  }
+
+  /* 侧边栏在移动端变为底部标签栏 */
+  .layout {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    width: 100% !important;
+    min-width: 100% !important;
+    height: 56px;
+    flex-direction: row;
+    border-right: none;
+    border-top: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+  }
+
+  .sidebarHeader, .projectInfo, .backBtn, .sidebarFooter {
+    display: none !important;
+  }
+
+  .nav {
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+    overflow-x: auto;
+    gap: 0;
+  }
+
+  .navItem {
+    flex: 1;
+    min-width: 0;
+    padding: 4px 2px;
+    justify-content: center;
+    font-size: 10px;
+    border-radius: 0;
+  }
+
+  .navLabel {
+    font-size: 10px;
+    line-height: 1.2;
+  }
+
+  .navIcon {
+    font-size: 18px;
+    margin-right: 0 !important;
+  }
+
+  .mainWrapper {
+    padding-bottom: 60px;
+    height: 100vh;
+    overflow-y: auto;
+  }
+
+  .breadcrumb {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px 12px;
+  }
+
+  .page-header h1 {
+    font-size: 18px;
+  }
+
+  .actions {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .contentArea {
+    flex-direction: column !important;
+  }
+
+  .listPanel {
+    width: 100% !important;
+    max-height: 200px;
+    border-right: none !important;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .detailPanel {
+    width: 100% !important;
+  }
+
+  .modal {
+    min-width: auto !important;
+    width: 92vw !important;
+    max-height: 85vh;
+    padding: 16px;
+  }
+
+  .modal h2 {
+    font-size: 16px;
+  }
+
+  .cardGrid, .projectGrid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .form-group {
+    margin-bottom: 10px;
+  }
+
+  input, select, textarea, .input, .select {
+    font-size: 16px !important;
+    padding: 10px 12px;
+  }
+
+  .btn {
+    padding: 8px 14px;
+    font-size: 13px;
+  }
+
+  .btn-sm {
+    padding: 5px 10px;
+    font-size: 11px;
+  }
+
+  .tabs {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .tab {
+    width: 100%;
+    text-align: left;
+    padding: 10px;
+  }
+
+  .kanban {
+    flex-direction: column;
+  }
+
+  .kanbanColumn {
+    width: 100% !important;
+    margin-bottom: 12px;
+  }
+}

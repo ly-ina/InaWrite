@@ -1,0 +1,17 @@
+{
+  "name": "Novel InaKB - 小说伊纳知识库",
+  "short_name": "InaKB",
+  "description": "本地优先的小说创作与世界观管理工具",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0d0d0d",
+  "theme_color": "#c9a96e",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
