@@ -46,7 +46,8 @@
 }
 
 /* 亮色主题 */
-[data-theme="light"] {
+[data-theme="light"],
+body.light-theme {
   --bg-primary: #faf8f5;
   --bg-secondary: #f3efe9;
   --bg-card: #ffffff;

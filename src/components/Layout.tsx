@@ -3,6 +3,7 @@
  * 左侧导航栏（根据是否在项目内切换菜单） + 顶部面包屑 + 主内容区
  */
 
+import { useEffect } from 'react';
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAppStore } from '../store/appStore';
 import { useT } from '../i18n';
@@ -71,6 +72,11 @@ export default function Layout() {
     setCurrentProject(null);
     navigate('/projects');
   };
+
+  // 同步 body class 以支持全局背景和组件外元素
+  useEffect(() => {
+    document.body.className = theme === 'light' ? 'light-theme' : '';
+  }, [theme]);
 
   return (
     <div className={styles.layout} data-theme={theme}>
