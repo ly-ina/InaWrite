@@ -19,6 +19,7 @@ const TOP_NAV = [
 /** 项目内子模块导航（进入项目后显示） */
 const PROJECT_NAV = [
   { path: '/dashboard', label: '概览', icon: '🏠' },
+  { path: '/outline', label: '大纲', icon: '📋' },
   { path: '/characters', label: '角色', icon: '👤' },
   { path: '/chapters', label: '章节', icon: '📖' },
   { path: '/timeline', label: '时间线', icon: '📅' },
@@ -26,6 +27,7 @@ const PROJECT_NAV = [
   { path: '/worldsettings', label: '世界观', icon: '🌍' },
   { path: '/resources', label: '资源', icon: '💎' },
   { path: '/templates', label: '模板', icon: '📦' },
+  { path: '/tags', label: '标签', icon: '🏷' },
   { path: '/ai', label: 'AI 助手', icon: '🤖' },
 ];
 
@@ -33,6 +35,7 @@ const PROJECT_NAV = [
 const BREADCRUMB_MAP: Record<string, string> = {
   '/projects': '作品列表',
   '/dashboard': '概览',
+  '/outline': '大纲编辑器',
   '/characters': '角色管理',
   '/chapters': '章节管理',
   '/foreshadows': '伏笔追踪',
@@ -40,6 +43,7 @@ const BREADCRUMB_MAP: Record<string, string> = {
   '/worldsettings': '世界观设定',
   '/resources': '资源追踪',
   '/templates': '模板与导入导出',
+  '/tags': '标签管理',
   '/ai': 'AI 写作助手',
 };
 

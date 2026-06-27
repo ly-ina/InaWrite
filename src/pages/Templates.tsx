@@ -3,7 +3,7 @@
  * 各模块导入模板下载 + 完整项目导出 + 数据导入
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAppStore } from '../store/appStore';
 import {
   getCharacterTemplate, getChapterTemplate, getForeshadowTemplate,
@@ -11,6 +11,11 @@ import {
 } from '../utils/templates';
 import { exportProject, downloadJSON, readJSONFile, executeImport } from '../utils/importExport';
 import { generateReport } from '../utils/backup';
+import { buildExportContext, exportPDF, exportDOCX, exportEPUB } from '../utils/exportFormats';
+import { useChapterStore } from '../store/chapterStore';
+import { useCharacterStore } from '../store/characterStore';
+import { useForeshadowStore } from '../store/foreshadowStore';
+import { useWorldSettingStore } from '../store/worldSettingStore';
 import styles from './Templates.module.css';
 
 /** 各模块模板配置 */
@@ -27,9 +32,23 @@ const MODULE_TEMPLATES = [
 
 export default function TemplatesPage() {
   const { currentProject } = useAppStore();
+  const { chapters, loadChapters } = useChapterStore();
+  const { characters, loadCharacters } = useCharacterStore();
+  const { foreshadows, loadForeshadows } = useForeshadowStore();
+  const { settings, loadSettings } = useWorldSettingStore();
 
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importStatus, setImportStatus] = useState<string>('');
+
+  // 加载数据
+  useEffect(() => {
+    if (currentProject) {
+      loadChapters(currentProject.id);
+      loadCharacters(currentProject.id);
+      loadForeshadows(currentProject.id);
+      loadSettings(currentProject.id);
+    }
+  }, [currentProject, loadChapters, loadCharacters, loadForeshadows, loadSettings]);
 
   /** 下载模板 */
   const handleDownloadTemplate = (key: string) => {
@@ -52,6 +71,33 @@ export default function TemplatesPage() {
     if (!currentProject) return;
     const json = await exportProject(currentProject);
     downloadJSON(json, `${currentProject.name}-${new Date().toISOString().slice(0, 10)}.json`);
+  };
+
+  /** 构建导出上下文 */
+  const getExportCtx = () => {
+    if (!currentProject) return null;
+    return buildExportContext(currentProject.name, chapters, characters, foreshadows, settings);
+  };
+
+  /** 导出 PDF */
+  const handleExportPDF = async () => {
+    const ctx = getExportCtx();
+    if (!ctx) return;
+    await exportPDF(ctx);
+  };
+
+  /** 导出 DOCX */
+  const handleExportDOCX = async () => {
+    const ctx = getExportCtx();
+    if (!ctx) return;
+    await exportDOCX(ctx);
+  };
+
+  /** 导出 EPUB */
+  const handleExportEPUB = () => {
+    const ctx = getExportCtx();
+    if (!ctx) return;
+    exportEPUB(ctx);
   };
 
   /** 导出创作报告 */
@@ -128,6 +174,17 @@ export default function TemplatesPage() {
             <button className="btn btn-primary" onClick={handleFullExport}>📦 完整设定导出</button>
             <button className="btn" onClick={handleExportJSON}>📄 JSON 格式</button>
             <button className="btn" onClick={handleExportReport}>📊 创作报告</button>
+          </div>
+        </section>
+
+        {/* 格式导出 */}
+        <section className={styles.section}>
+          <h3>📚 格式导出</h3>
+          <p className={styles.sectionDesc}>导出小说正文为常用格式（按章节顺序合并）</p>
+          <div className={styles.exportActions}>
+            <button className="btn" onClick={handleExportPDF}>📕 PDF 导出</button>
+            <button className="btn" onClick={handleExportDOCX}>📘 DOCX 导出</button>
+            <button className="btn" onClick={handleExportEPUB}>📗 EPUB/HTML 导出</button>
           </div>
         </section>
 

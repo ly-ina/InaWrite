@@ -9,7 +9,7 @@ import { openDB, type IDBPDatabase } from 'idb';
 // 数据库名称和版本
 const DB_NAME = 'novel-inakb-db';
 const OLD_DB_NAME = 'novel-kb-db';
-const DB_VERSION = 1;
+const DB_VERSION = 3;
 
 // ========== 数据库初始化 ==========
 
@@ -58,7 +58,7 @@ function getDB(): Promise<IDBPDatabase> {
   if (!dbPromise) {
     dbPromise = (async () => {
       const db = await openDB(DB_NAME, DB_VERSION, {
-        upgrade(db) {
+        upgrade(db, oldVersion) {
           if (!db.objectStoreNames.contains('projects')) {
             db.createObjectStore('projects', { keyPath: 'id' });
           }
@@ -77,6 +77,25 @@ function getDB(): Promise<IDBPDatabase> {
           if (!db.objectStoreNames.contains('worldSettings')) {
             const store = db.createObjectStore('worldSettings', { keyPath: 'id' });
             store.createIndex('projectId', 'projectId');
+          }
+          if (oldVersion < 2 && !db.objectStoreNames.contains('outlines')) {
+            const store = db.createObjectStore('outlines', { keyPath: 'id' });
+            store.createIndex('projectId', 'projectId');
+          }
+          if (oldVersion < 3) {
+            if (!db.objectStoreNames.contains('writingSessions')) {
+              const store = db.createObjectStore('writingSessions', { keyPath: 'id' });
+              store.createIndex('projectId', 'projectId');
+            }
+            if (!db.objectStoreNames.contains('tags')) {
+              const store = db.createObjectStore('tags', { keyPath: 'id' });
+              store.createIndex('projectId', 'projectId');
+            }
+            if (!db.objectStoreNames.contains('tagAssignments')) {
+              const store = db.createObjectStore('tagAssignments', { keyPath: 'id' });
+              store.createIndex('tagId', 'tagId');
+              store.createIndex('targetType', 'targetType');
+            }
           }
         },
       });
@@ -231,5 +250,55 @@ export const db = {
     remove: (id: string) => remove('worldSettings', id),
     deleteByProject: (projectId: string) => deleteByProject('worldSettings', projectId),
     addMany: (items: import('../types').WorldSetting[]) => addMany('worldSettings', items),
+  },
+
+  // 大纲操作
+  outlines: {
+    getAll: () => getAll<import('../types').OutlineNode>('outlines'),
+    getByProject: (projectId: string) =>
+      getByProject<import('../types').OutlineNode>('outlines', projectId),
+    getById: (id: string) => getById<import('../types').OutlineNode>('outlines', id),
+    add: (item: import('../types').OutlineNode) => add('outlines', item),
+    update: (item: import('../types').OutlineNode) => update('outlines', item),
+    remove: (id: string) => remove('outlines', id),
+    deleteByProject: (projectId: string) => deleteByProject('outlines', projectId),
+    addMany: (items: import('../types').OutlineNode[]) => addMany('outlines', items),
+  },
+
+  // 写作会话
+  writingSessions: {
+    getAll: () => getAll<import('../types').WritingSession>('writingSessions'),
+    getByProject: (projectId: string) =>
+      getByProject<import('../types').WritingSession>('writingSessions', projectId),
+    add: (item: import('../types').WritingSession) => add('writingSessions', item),
+    remove: (id: string) => remove('writingSessions', id),
+    deleteByProject: (projectId: string) => deleteByProject('writingSessions', projectId),
+  },
+
+  // 标签
+  tags: {
+    getAll: () => getAll<import('../types').Tag>('tags'),
+    getByProject: (projectId: string) =>
+      getByProject<import('../types').Tag>('tags', projectId),
+    getById: (id: string) => getById<import('../types').Tag>('tags', id),
+    add: (item: import('../types').Tag) => add('tags', item),
+    update: (item: import('../types').Tag) => update('tags', item),
+    remove: (id: string) => remove('tags', id),
+    deleteByProject: (projectId: string) => deleteByProject('tags', projectId),
+  },
+
+  // 标签关联
+  tagAssignments: {
+    getAll: () => getAll<import('../types').TagAssignment>('tagAssignments'),
+    add: (item: import('../types').TagAssignment) => add('tagAssignments', item),
+    remove: (id: string) => remove('tagAssignments', id),
+    getByTag: async (tagId: string): Promise<import('../types').TagAssignment[]> => {
+      const db = await getDB();
+      return db.getAllFromIndex('tagAssignments', 'tagId', tagId);
+    },
+    getByTarget: async (targetType: string): Promise<import('../types').TagAssignment[]> => {
+      const db = await getDB();
+      return db.getAllFromIndex('tagAssignments', 'targetType', targetType);
+    },
   },
 };

@@ -15,6 +15,8 @@ import WorldSettingsPage from './pages/WorldSettings';
 import ResourcesPage from './pages/Resources';
 import TemplatesPage from './pages/Templates';
 import AIAssistantPage from './pages/AIAssistant';
+import OutlinePage from './pages/Outline';
+import TagsPage from './pages/Tags';
 import './styles/global.css';
 
 export default function App() {
@@ -44,6 +46,10 @@ export default function App() {
           <Route path="templates" element={<TemplatesPage />} />
           {/* AI 写作助手 */}
           <Route path="ai" element={<AIAssistantPage />} />
+          {/* 大纲编辑器 */}
+          <Route path="outline" element={<OutlinePage />} />
+          {/* 标签管理 */}
+          <Route path="tags" element={<TagsPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

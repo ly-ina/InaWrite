@@ -84,7 +84,34 @@ export interface Chapter {
   foreshadowsAdded: string[];     // 新增伏笔 ID
   foreshadowsResolved: string[];  // 回收伏笔 ID
   locations: string[];     // 地点 ID
+  content?: string;        // 章节正文内容（Markdown）
+  outlineNodeId?: string;  // 关联的大纲节点 ID
   meta?: Record<string, unknown>;
+}
+
+// ========== 大纲编辑器 ==========
+/** 大纲节点类型 */
+export type OutlineNodeType = 'volume' | 'chapter' | 'section' | 'scene';
+
+/** 大纲节点 */
+export interface OutlineNode {
+  id: string;
+  projectId: string;
+  parentId: string | null;   // 父节点 ID，null 表示根节点
+  type: OutlineNodeType;      // 卷/章/节/场景
+  title: string;              // 标题
+  sortOrder: number;          // 同级排序序号
+  chapterId?: string;         // 关联的章节 ID（大纲→章节双向同步）
+  characters: string[];       // 计划出场角色 ID
+  foreshadowsPlanted: string[];  // 计划埋设伏笔 ID
+  foreshadowsResolved: string[]; // 计划回收伏笔 ID
+  worldSettingsIntroduced: string[]; // 计划引入的世界观设定 ID
+  notes?: string;             // 备注（Markdown）
+  color?: string;             // 节点颜色标记
+  collapsed?: boolean;        // UI 折叠状态
+  estimatedWords?: number;    // 预估字数
+  createdAt: string;
+  updatedAt: string;
 }
 
 // ========== 伏笔 ==========
@@ -128,6 +155,35 @@ export interface ProjectExport {
   chapters: Chapter[];
   foreshadows: Foreshadow[];
   worldSettings: WorldSetting[];
+}
+
+// ========== 写作会话与标签 ==========
+export interface WritingSession {
+  id: string;
+  projectId: string;
+  chapterId?: string;        // 编辑的章节 ID
+  startedAt: string;         // 开始时间 ISO
+  endedAt: string;           // 结束时间 ISO
+  duration: number;          // 持续时间（秒）
+  wordsWritten: number;      // 本次写作字数
+  wordsTarget?: number;      // 目标字数
+  notes?: string;
+}
+
+export interface Tag {
+  id: string;
+  projectId: string;
+  name: string;
+  color: string;
+  description?: string;
+  createdAt: string;
+}
+
+export interface TagAssignment {
+  id: string;
+  tagId: string;
+  targetType: 'character' | 'chapter' | 'foreshadow' | 'worldSetting' | 'outline';
+  targetId: string;
 }
 
 // ========== 辅助类型 ==========
