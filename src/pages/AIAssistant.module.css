@@ -186,6 +186,94 @@
   border: 1px solid var(--border-color);
 }
 
+/* ========== 对比/选择视图 ========== */
+.matchGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+}
+
+.matchCard {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  transition: border-color 0.15s;
+}
+
+.matchCard:hover {
+  border-color: var(--border-light);
+}
+
+.matchCard.matchnew {
+  border-left: 3px solid var(--success);
+}
+
+.matchCard.matchupdate {
+  border-left: 3px solid var(--accent);
+}
+
+.matchCard.matchduplicate {
+  border-left: 3px solid var(--danger);
+  opacity: 0.65;
+}
+
+.matchCheck {
+  flex-shrink: 0;
+  padding-top: 2px;
+  cursor: pointer;
+}
+
+.matchCheck input {
+  cursor: pointer;
+  width: 15px;
+  height: 15px;
+}
+
+.matchContent {
+  flex: 1;
+  min-width: 0;
+}
+
+.matchBadge {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  margin-left: 6px;
+  flex-shrink: 0;
+}
+
+.badgenew {
+  background: rgba(90, 158, 111, 0.12);
+  color: #5a9e6f;
+}
+
+.badgeupdate {
+  background: rgba(201, 169, 110, 0.12);
+  color: #c9a96e;
+}
+
+.badgeduplicate {
+  background: rgba(196, 75, 75, 0.12);
+  color: #c44b4b;
+}
+
+.matchHint {
+  font-size: 11px;
+  color: var(--accent);
+  margin-top: 2px;
+}
+
+.matchWarning {
+  font-size: 11px;
+  color: var(--danger);
+  margin-top: 2px;
+}
+
 .itemName {
   font-size: 14px;
   font-weight: 600;

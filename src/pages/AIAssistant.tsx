@@ -12,9 +12,12 @@ import { useChapterStore } from '../store/chapterStore';
 import {
   getAIConfig, updateAIConfig,
   getWritingSuggestions, analyzeNovelText, analyzeResourceUpdates,
-  applyAnalysisResult, applyResourceUpdates,
+  applySelectedResults, applyResourceUpdates,
   analyzeCharacterArc,
+  matchAnalysisWithExisting,
   type AnalysisResult, type ApplyResult,
+  type MatchableAnalysisResult, type MatchableCharacter,
+  type MatchableWorldSetting, type MatchableForeshadow,
 } from '../utils/aiService';
 import styles from './AIAssistant.module.css';
 
@@ -33,9 +36,12 @@ export default function AIAssistantPage() {
 
   // 文本分析
   const [inputText, setInputText] = useState('');
-  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<MatchableAnalysisResult | null>(null);
   const [applyStats, setApplyStats] = useState<ApplyResult | null>(null);
   const [expandedSection, setExpandedSection] = useState<Set<string>>(new Set(['characters', 'worldSettings', 'foreshadows']));
+  const [selectAllChars, setSelectAllChars] = useState(true);
+  const [selectAllSettings, setSelectAllSettings] = useState(true);
+  const [selectAllForeshadows, setSelectAllForeshadows] = useState(true);
 
   // 创作建议
   const [suggestion, setSuggestion] = useState('');
@@ -75,6 +81,53 @@ export default function AIAssistantPage() {
     });
   };
 
+  // 单项选择切换
+  const toggleCharSelect = (index: number) => {
+    if (!analysisResult) return;
+    const chars = [...analysisResult.characters];
+    chars[index] = { ...chars[index], _selected: !chars[index]._selected };
+    setAnalysisResult({ ...analysisResult, characters: chars });
+  };
+
+  const toggleSettingSelect = (index: number) => {
+    if (!analysisResult) return;
+    const items = [...analysisResult.worldSettings];
+    items[index] = { ...items[index], _selected: !items[index]._selected };
+    setAnalysisResult({ ...analysisResult, worldSettings: items });
+  };
+
+  const toggleForeshadowSelect = (index: number) => {
+    if (!analysisResult) return;
+    const items = [...analysisResult.foreshadows];
+    items[index] = { ...items[index], _selected: !items[index]._selected };
+    setAnalysisResult({ ...analysisResult, foreshadows: items });
+  };
+
+  // 全选/取消
+  const toggleAllChars = () => {
+    if (!analysisResult) return;
+    const next = !selectAllChars;
+    setSelectAllChars(next);
+    const chars = analysisResult.characters.map((c) => ({ ...c, _selected: next }));
+    setAnalysisResult({ ...analysisResult, characters: chars });
+  };
+
+  const toggleAllSettings = () => {
+    if (!analysisResult) return;
+    const next = !selectAllSettings;
+    setSelectAllSettings(next);
+    const items = analysisResult.worldSettings.map((w) => ({ ...w, _selected: next }));
+    setAnalysisResult({ ...analysisResult, worldSettings: items });
+  };
+
+  const toggleAllForeshadows = () => {
+    if (!analysisResult) return;
+    const next = !selectAllForeshadows;
+    setSelectAllForeshadows(next);
+    const items = analysisResult.foreshadows.map((f) => ({ ...f, _selected: next }));
+    setAnalysisResult({ ...analysisResult, foreshadows: items });
+  };
+
   // ===== 文本分析 =====
   const handleAnalyze = async () => {
     if (!inputText.trim() || !currentProject) return;
@@ -83,12 +136,21 @@ export default function AIAssistantPage() {
     setAnalysisResult(null);
     setApplyStats(null);
     try {
-      const result = await analyzeNovelText(inputText, {
+      const rawResult = await analyzeNovelText(inputText, {
         characters: characters.map((c) => ({ name: c.name, id: c.id })),
         worldSettings: settings.map((s) => ({ name: s.name, id: s.id })),
         foreshadows: foreshadows.map((f) => ({ content: f.content, id: f.id })),
       });
-      setAnalysisResult(result);
+      // 智能对比并标记状态
+      const matched = matchAnalysisWithExisting(rawResult,
+        characters.map((c) => ({ name: c.name, id: c.id })),
+        settings.map((s) => ({ name: s.name, id: s.id })),
+        foreshadows.map((f) => ({ content: f.content, id: f.id }))
+      );
+      setAnalysisResult(matched);
+      setSelectAllChars(true);
+      setSelectAllSettings(true);
+      setSelectAllForeshadows(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : '分析失败');
     } finally {
@@ -101,7 +163,7 @@ export default function AIAssistantPage() {
     setLoading(true);
     setError('');
     try {
-      const stats = await applyAnalysisResult(currentProject.id, analysisResult);
+      const stats = await applySelectedResults(currentProject.id, analysisResult);
       setApplyStats(stats);
       triggerRefresh();
       // 重新加载数据
@@ -291,7 +353,7 @@ export default function AIAssistantPage() {
                 <h2>分析结果</h2>
                 {!applyStats && (
                   <button className="btn btn-primary" onClick={handleApply} disabled={loading}>
-                    ✅ 一键应用到作品
+                    ✅ 应用选中的项
                   </button>
                 )}
               </div>
@@ -317,33 +379,48 @@ export default function AIAssistantPage() {
                 <div className={styles.sectionTitle} onClick={() => toggleSection('characters')}>
                   <span>{expandedSection.has('characters') ? '▾' : '▸'}</span>
                   👤 提取角色 ({analysisResult.characters.length})
+                  <span style={{ marginLeft: 'auto', marginRight: '8px', fontSize: '11px', cursor: 'pointer' }}
+                    onClick={(e) => { e.stopPropagation(); toggleAllChars(); }}>
+                    {selectAllChars ? '取消全选' : '全选'}
+                  </span>
                 </div>
                 {expandedSection.has('characters') && (
-                  <div className={styles.itemGrid}>
+                  <div className={styles.matchGrid}>
                     {analysisResult.characters.map((c, i) => (
-                      <div key={i} className={styles.itemCard}>
-                        <div className={styles.itemName}>{c.name}</div>
-                        <div className={styles.itemMeta}>
-                          {c.race && <span>种族：{c.race}</span>}
-                          {c.status && <span className={`tag tag-${c.status}`}>{c.status}</span>}
+                      <div key={i} className={`${styles.matchCard} ${styles[`match${c._matchStatus}`]}`}>
+                        <label className={styles.matchCheck}>
+                          <input type="checkbox" checked={c._selected} onChange={() => toggleCharSelect(i)} />
+                        </label>
+                        <div className={styles.matchContent}>
+                          <div className={styles.itemName}>
+                            {c.name}
+                            <span className={`${styles.matchBadge} ${styles[`badge${c._matchStatus}`]}`}>
+                              {c._matchStatus === 'new' ? '新增' : c._matchStatus === 'update' ? '更新' : '重复'}
+                            </span>
+                          </div>
+                          {c._existingName && (
+                            <div className={styles.matchHint}>已有：{c._existingName}</div>
+                          )}
+                          {c._duplicateOf && (
+                            <div className={styles.matchWarning}>⚠ {c._duplicateOf}</div>
+                          )}
+                          <div className={styles.itemMeta}>
+                            {c.race && <span>种族：{c.race}</span>}
+                            {c.status && <span>{c.status}</span>}
+                          </div>
+                          {c.resources?.length ? (
+                            <div className={styles.itemTags}>
+                              {c.resources.map((r, j) => <span key={j} className={styles.tag}>{r.type}: {r.name}</span>)}
+                            </div>
+                          ) : null}
+                          {c.relations?.length ? (
+                            <div className={styles.itemTags}>
+                              {c.relations.map((r, j) => (
+                                <span key={j} className={styles.relationTag}>{r.direction === '单向' ? '→' : '↔'} {r.targetName}（{r.type}）</span>
+                              ))}
+                            </div>
+                          ) : null}
                         </div>
-                        {c.personality && <div className={styles.itemDesc}>性格：{c.personality.slice(0, 80)}</div>}
-                        {c.resources?.length ? (
-                          <div className={styles.itemTags}>
-                            {c.resources.map((r, j) => (
-                              <span key={j} className={styles.tag}>{r.type}: {r.name}</span>
-                            ))}
-                          </div>
-                        ) : null}
-                        {c.relations?.length ? (
-                          <div className={styles.itemTags} style={{ marginTop: '4px' }}>
-                            {c.relations.map((r, j) => (
-                              <span key={j} className={styles.relationTag}>
-                                {r.direction === '单向' ? '→' : '↔'} {r.targetName}（{r.type}）
-                              </span>
-                            ))}
-                          </div>
-                        ) : null}
                       </div>
                     ))}
                     {analysisResult.characters.length === 0 && <span className={styles.muted}>未提取到新角色</span>}
@@ -356,25 +433,30 @@ export default function AIAssistantPage() {
                 <div className={styles.sectionTitle} onClick={() => toggleSection('worldSettings')}>
                   <span>{expandedSection.has('worldSettings') ? '▾' : '▸'}</span>
                   🌍 提取设定 ({analysisResult.worldSettings.length})
+                  <span style={{ marginLeft: 'auto', marginRight: '8px', fontSize: '11px', cursor: 'pointer' }}
+                    onClick={(e) => { e.stopPropagation(); toggleAllSettings(); }}>
+                    {selectAllSettings ? '取消全选' : '全选'}
+                  </span>
                 </div>
                 {expandedSection.has('worldSettings') && (
-                  <div className={styles.itemGrid}>
+                  <div className={styles.matchGrid}>
                     {analysisResult.worldSettings.map((w, i) => (
-                      <div key={i} className={styles.itemCard}>
-                        <div className={styles.itemName}>
-                          <span className={styles.tag}>{w.type}</span> {w.name}
-                        </div>
-                        <div className={styles.itemDesc}>{w.description.slice(0, 120)}</div>
-                        {w.parentName && <div className={styles.itemMeta}>属于：{w.parentName}</div>}
-                        {w.relations?.length ? (
-                          <div className={styles.itemTags} style={{ marginTop: '4px' }}>
-                            {w.relations.map((r, j) => (
-                              <span key={j} className={styles.relationTag}>
-                                {r.type} → {r.targetName}
-                              </span>
-                            ))}
+                      <div key={i} className={`${styles.matchCard} ${styles[`match${w._matchStatus}`]}`}>
+                        <label className={styles.matchCheck}>
+                          <input type="checkbox" checked={w._selected} onChange={() => toggleSettingSelect(i)} />
+                        </label>
+                        <div className={styles.matchContent}>
+                          <div className={styles.itemName}>
+                            <span className={styles.tag}>{w.type}</span> {w.name}
+                            <span className={`${styles.matchBadge} ${styles[`badge${w._matchStatus}`]}`}>
+                              {w._matchStatus === 'new' ? '新增' : w._matchStatus === 'update' ? '更新' : '重复'}
+                            </span>
                           </div>
-                        ) : null}
+                          {w._existingName && <div className={styles.matchHint}>已有：{w._existingName}</div>}
+                          {w._duplicateOf && <div className={styles.matchWarning}>⚠ {w._duplicateOf}</div>}
+                          <div className={styles.itemDesc}>{w.description.slice(0, 120)}</div>
+                          {w.parentName && <div className={styles.itemMeta}>属于：{w.parentName}</div>}
+                        </div>
                       </div>
                     ))}
                     {analysisResult.worldSettings.length === 0 && <span className={styles.muted}>未提取到新设定</span>}
@@ -387,20 +469,31 @@ export default function AIAssistantPage() {
                 <div className={styles.sectionTitle} onClick={() => toggleSection('foreshadows')}>
                   <span>{expandedSection.has('foreshadows') ? '▾' : '▸'}</span>
                   🔮 发现伏笔 ({analysisResult.foreshadows.length})
+                  <span style={{ marginLeft: 'auto', marginRight: '8px', fontSize: '11px', cursor: 'pointer' }}
+                    onClick={(e) => { e.stopPropagation(); toggleAllForeshadows(); }}>
+                    {selectAllForeshadows ? '取消全选' : '全选'}
+                  </span>
                 </div>
                 {expandedSection.has('foreshadows') && (
-                  <div className={styles.itemList}>
+                  <div className={styles.matchGrid}>
                     {analysisResult.foreshadows.map((f, i) => (
-                      <div key={i} className={styles.foreshadowItem}>
-                        <span className={`${styles.confidence} ${styles[`conf${f.confidence}`]}`}>
-                          {f.confidence === 'high' ? '🔴' : f.confidence === 'medium' ? '🟡' : '🟢'}
-                        </span>
-                        <span className={styles.foreshadowContent}>{f.content}</span>
-                        {f.relatedCharacters.length > 0 && (
-                          <span className={styles.foreshadowChars}>
-                            关联：{f.relatedCharacters.join('、')}
-                          </span>
-                        )}
+                      <div key={i} className={`${styles.matchCard} ${styles[`match${f._matchStatus}`]}`}>
+                        <label className={styles.matchCheck}>
+                          <input type="checkbox" checked={f._selected} onChange={() => toggleForeshadowSelect(i)} />
+                        </label>
+                        <div className={styles.matchContent}>
+                          <div className={styles.itemName} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span>{f.confidence === 'high' ? '🔴' : f.confidence === 'medium' ? '🟡' : '🟢'}</span>
+                            <span className={`${styles.matchBadge} ${styles[`badge${f._matchStatus}`]}`}>
+                              {f._matchStatus === 'new' ? '新增' : f._matchStatus === 'update' ? '已存在' : '重复'}
+                            </span>
+                          </div>
+                          <div className={styles.itemDesc}>{f.content}</div>
+                          {f._existingContent && <div className={styles.matchHint}>已有：{f._existingContent.slice(0, 60)}...</div>}
+                          {f.relatedCharacters.length > 0 && (
+                            <div className={styles.itemMeta}>关联：{f.relatedCharacters.join('、')}</div>
+                          )}
+                        </div>
                       </div>
                     ))}
                     {analysisResult.foreshadows.length === 0 && <span className={styles.muted}>未发现明显伏笔</span>}

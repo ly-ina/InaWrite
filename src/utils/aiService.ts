@@ -126,6 +126,394 @@ export interface AnalysisResult {
   suggestions: string[];
 }
 
+// ========== 带匹配状态的分析结果（用于选择性应用） ==========
+
+export type MatchStatus = 'new' | 'update' | 'duplicate';
+
+export interface MatchableCharacter extends ExtractedCharacter {
+  _matchStatus: MatchStatus;
+  _existingName?: string;
+  _existingId?: string;
+  _duplicateOf?: string;
+  _selected: boolean;
+}
+
+export interface MatchableWorldSetting extends ExtractedWorldSetting {
+  _matchStatus: MatchStatus;
+  _existingName?: string;
+  _existingId?: string;
+  _duplicateOf?: string;
+  _selected: boolean;
+}
+
+export interface MatchableForeshadow extends ExtractedForeshadow {
+  _matchStatus: MatchStatus;
+  _existingContent?: string;
+  _existingId?: string;
+  _selected: boolean;
+}
+
+export interface MatchableAnalysisResult {
+  characters: MatchableCharacter[];
+  worldSettings: MatchableWorldSetting[];
+  foreshadows: MatchableForeshadow[];
+  summary: string;
+  suggestions: string[];
+}
+
+/** 计算两个字符串的简单相似度（基于包含关系 + 公共子串） */
+function stringSimilarity(a: string, b: string): number {
+  const la = a.trim().toLowerCase();
+  const lb = b.trim().toLowerCase();
+  if (la === lb) return 1;
+  if (la.includes(lb) || lb.includes(la)) return 0.85;
+  // 简单 Jaccard 字符集相似度
+  const setA = new Set(la.replace(/\s+/g, ''));
+  const setB = new Set(lb.replace(/\s+/g, ''));
+  const intersection = new Set([...setA].filter((x) => setB.has(x)));
+  const union = new Set([...setA, ...setB]);
+  return intersection.size / union.size;
+}
+
+/**
+ * 对 AI 分析结果进行智能对比，标记每项的状态：
+ * - 'new': 完全不存在，可以安全新增
+ * - 'update': 与已有数据匹配，建议更新
+ * - 'duplicate': 与其他提取项重复，建议跳过
+ */
+export function matchAnalysisWithExisting(
+  result: AnalysisResult,
+  existingChars: { name: string; id: string }[],
+  existingSettings: { name: string; id: string }[],
+  existingForeshadows: { content: string; id: string }[]
+): MatchableAnalysisResult {
+  const charNameMap = new Map(existingChars.map((c) => [c.name.trim().toLowerCase(), c]));
+  const settingNameMap = new Map(existingSettings.map((s) => [s.name.trim().toLowerCase(), s]));
+  const foreshadowContentMap = new Map(existingForeshadows.map((f) => [f.content.trim().toLowerCase(), f]));
+
+  // 角色匹配 + 去重
+  const matchChars: MatchableCharacter[] = [];
+  const seenCharNames = new Map<string, number>(); // name → 第一次出现的 index
+
+  result.characters.forEach((c, i) => {
+    const key = c.name.trim().toLowerCase();
+    const existing = charNameMap.get(key);
+    let status: MatchStatus = 'new';
+    let duplicateOf: string | undefined;
+    let existingName: string | undefined;
+    let existingId: string | undefined;
+
+    if (existing) {
+      status = 'update';
+      existingName = existing.name;
+      existingId = existing.id;
+    } else if (seenCharNames.has(key)) {
+      status = 'duplicate';
+      duplicateOf = `与第 ${seenCharNames.get(key)! + 1} 项重复`;
+    } else {
+      // 检查是否与已有角色高度相似（名称包含关系）
+      for (const [ekey, echar] of charNameMap) {
+        if (stringSimilarity(key, ekey) > 0.7 && !existingChars.some((ec) => ec.name.trim().toLowerCase() === key)) {
+          status = 'update';
+          existingName = echar.name;
+          existingId = echar.id;
+          break;
+        }
+      }
+      // 检查是否与前面提取的角色高度相似
+      if (status === 'new') {
+        for (let j = 0; j < i; j++) {
+          const prevKey = result.characters[j].name.trim().toLowerCase();
+          if (prevKey !== key && stringSimilarity(key, prevKey) > 0.7) {
+            status = 'duplicate';
+            duplicateOf = `与「${result.characters[j].name}」高度相似`;
+            break;
+          }
+        }
+      }
+    }
+
+    if (!seenCharNames.has(key)) seenCharNames.set(key, i);
+
+    matchChars.push({
+      ...c,
+      _matchStatus: status,
+      _existingName: existingName,
+      _existingId: existingId,
+      _duplicateOf: duplicateOf,
+      _selected: status !== 'duplicate', // 重复项默认不选中
+    });
+  });
+
+  // 世界观设定匹配 + 去重
+  const matchSettings: MatchableWorldSetting[] = [];
+  const seenSettingNames = new Map<string, number>();
+
+  result.worldSettings.forEach((w, i) => {
+    const key = w.name.trim().toLowerCase();
+    const existing = settingNameMap.get(key);
+    let status: MatchStatus = 'new';
+    let duplicateOf: string | undefined;
+    let existingName: string | undefined;
+    let existingId: string | undefined;
+
+    if (existing) {
+      status = 'update';
+      existingName = existing.name;
+      existingId = existing.id;
+    } else if (seenSettingNames.has(key)) {
+      status = 'duplicate';
+      duplicateOf = `与第 ${seenSettingNames.get(key)! + 1} 项重复`;
+    } else {
+      for (const [ekey, es] of settingNameMap) {
+        if (stringSimilarity(key, ekey) > 0.7) {
+          status = 'update';
+          existingName = es.name;
+          existingId = es.id;
+          break;
+        }
+      }
+      if (status === 'new') {
+        for (let j = 0; j < i; j++) {
+          const prevKey = result.worldSettings[j].name.trim().toLowerCase();
+          if (prevKey !== key && stringSimilarity(key, prevKey) > 0.7) {
+            status = 'duplicate';
+            duplicateOf = `与「${result.worldSettings[j].name}」高度相似`;
+            break;
+          }
+        }
+      }
+    }
+
+    if (!seenSettingNames.has(key)) seenSettingNames.set(key, i);
+
+    matchSettings.push({
+      ...w,
+      _matchStatus: status,
+      _existingName: existingName,
+      _existingId: existingId,
+      _duplicateOf: duplicateOf,
+      _selected: status !== 'duplicate',
+    });
+  });
+
+  // 伏笔匹配 + 去重
+  const matchForeshadows: MatchableForeshadow[] = [];
+  const seenFShadowContents = new Map<string, number>();
+
+  result.foreshadows.forEach((f, i) => {
+    const key = f.content.trim().toLowerCase();
+    const existing = foreshadowContentMap.get(key);
+    let status: MatchStatus = 'new';
+    let existingContent: string | undefined;
+    let existingId: string | undefined;
+
+    if (existing) {
+      status = 'update';
+      existingContent = existing.content;
+      existingId = existing.id;
+    } else if (seenFShadowContents.has(key)) {
+      status = 'duplicate';
+    } else {
+      for (const [ekey, ef] of foreshadowContentMap) {
+        if (stringSimilarity(key, ekey) > 0.7) {
+          status = 'update';
+          existingContent = ef.content;
+          existingId = ef.id;
+          break;
+        }
+      }
+      if (status === 'new') {
+        for (let j = 0; j < i; j++) {
+          const prevKey = result.foreshadows[j].content.trim().toLowerCase();
+          if (prevKey !== key && stringSimilarity(key, prevKey) > 0.7) {
+            status = 'duplicate';
+            break;
+          }
+        }
+      }
+    }
+
+    if (!seenFShadowContents.has(key)) seenFShadowContents.set(key, i);
+
+    matchForeshadows.push({
+      ...f,
+      _matchStatus: status,
+      _existingContent: existingContent,
+      _existingId: existingId,
+      _selected: status !== 'duplicate',
+    });
+  });
+
+  return {
+    characters: matchChars,
+    worldSettings: matchSettings,
+    foreshadows: matchForeshadows,
+    summary: result.summary,
+    suggestions: result.suggestions,
+  };
+}
+
+/**
+ * 应用选中的分析结果到数据库
+ */
+export async function applySelectedResults(
+  projectId: string,
+  matchResult: MatchableAnalysisResult
+): Promise<ApplyResult> {
+  const stats: ApplyResult = {
+    charactersAdded: 0,
+    charactersUpdated: 0,
+    characterRelationsAdded: 0,
+    worldSettingsAdded: 0,
+    worldSettingsUpdated: 0,
+    worldSettingRelationsAdded: 0,
+    foreshadowsAdded: 0,
+  };
+
+  const [existingChars, existingSettings, existingForeshadows] = await Promise.all([
+    db.characters.getByProject(projectId),
+    db.worldSettings.getByProject(projectId),
+    db.foreshadows.getByProject(projectId),
+  ]);
+
+  const charNameMap = new Map(existingChars.map((c) => [c.name.trim().toLowerCase(), c]));
+  const settingNameMap = new Map(existingSettings.map((s) => [s.name.trim().toLowerCase(), s]));
+  const updatedChars = new Map<string, Character>();
+
+  // 角色
+  for (const mc of matchResult.characters) {
+    if (!mc._selected) continue;
+    const key = mc.name.trim().toLowerCase();
+    const existing = mc._existingId
+      ? existingChars.find((c) => c.id === mc._existingId)
+      : charNameMap.get(key);
+
+    if (existing && mc._matchStatus === 'update') {
+      const updated: Character = {
+        ...existing,
+        race: existing.race || mc.race || existing.race,
+        age: existing.age || mc.age || existing.age,
+        appearance: existing.appearance || mc.appearance || existing.appearance,
+        personality: existing.personality || mc.personality || existing.personality,
+        description: existing.description || mc.description || existing.description,
+        status: mc.status || existing.status,
+        currentLocation: existing.currentLocation || mc.currentLocation || existing.currentLocation,
+      };
+      if (mc.resources?.length) {
+        const existingResNames = new Set(existing.resources.map((r) => r.name.trim().toLowerCase()));
+        const newResources = mc.resources
+          .filter((r) => !existingResNames.has(r.name.trim().toLowerCase()))
+          .map((r): Resource => ({
+            id: generateId(),
+            name: r.name,
+            type: r.type as Resource['type'] || '其他',
+            description: r.description,
+            status: (r.status as Resource['status']) || '已获得',
+          }));
+        if (newResources.length > 0) updated.resources = [...existing.resources, ...newResources];
+      }
+      await db.characters.update(updated);
+      updatedChars.set(key, updated);
+      stats.charactersUpdated++;
+    } else if (mc._matchStatus !== 'duplicate') {
+      const newChar: Character = {
+        id: generateId(), projectId, name: mc.name,
+        aliases: mc.aliases, race: mc.race, age: mc.age,
+        appearance: mc.appearance, personality: mc.personality,
+        description: mc.description || '', status: mc.status || 'alive',
+        currentLocation: mc.currentLocation,
+        relations: [],
+        resources: (mc.resources || []).map((r): Resource => ({
+          id: generateId(), name: r.name,
+          type: r.type as Resource['type'] || '其他',
+          description: r.description,
+          status: (r.status as Resource['status']) || '已获得',
+        })),
+        appearances: [],
+      };
+      await db.characters.add(newChar);
+      charNameMap.set(key, newChar);
+      updatedChars.set(key, newChar);
+      stats.charactersAdded++;
+    }
+  }
+
+  // 角色关系
+  for (const mc of matchResult.characters) {
+    if (!mc._selected || !mc.relations?.length) continue;
+    const charKey = mc.name.trim().toLowerCase();
+    const char = updatedChars.get(charKey) || charNameMap.get(charKey);
+    if (!char) continue;
+    for (const er of mc.relations) {
+      const target = charNameMap.get(er.targetName.trim().toLowerCase());
+      if (!target || target.id === char.id) continue;
+      if (char.relations.some((r) => r.targetId === target.id && r.type === er.type)) continue;
+      char.relations.push({ targetId: target.id, type: er.type, direction: er.direction || '双向', description: er.description || '', isPublic: er.isPublic !== false });
+      stats.characterRelationsAdded++;
+    }
+    if (mc.relations.length > 0) await db.characters.update(char);
+  }
+
+  // 世界观
+  const updatedSettings = new Map<string, WorldSetting>();
+  for (const mw of matchResult.worldSettings) {
+    if (!mw._selected) continue;
+    const key = mw.name.trim().toLowerCase();
+    const existing = mw._existingId
+      ? existingSettings.find((s) => s.id === mw._existingId)
+      : settingNameMap.get(key);
+
+    let parentId: string | undefined;
+    if (mw.parentName) {
+      const pk = mw.parentName.trim().toLowerCase();
+      parentId = settingNameMap.get(pk)?.id;
+    }
+
+    if (existing && mw._matchStatus === 'update') {
+      const updated: WorldSetting = { ...existing, type: existing.type !== 'custom' ? existing.type : mw.type, description: existing.description || mw.description || existing.description, parentId: existing.parentId || parentId };
+      await db.worldSettings.update(updated);
+      updatedSettings.set(key, updated);
+      stats.worldSettingsUpdated++;
+    } else if (mw._matchStatus !== 'duplicate') {
+      const ns: WorldSetting = { id: generateId(), projectId, name: mw.name, type: mw.type, description: mw.description, parentId, relations: [] };
+      await db.worldSettings.add(ns);
+      settingNameMap.set(key, ns);
+      updatedSettings.set(key, ns);
+      stats.worldSettingsAdded++;
+    }
+  }
+
+  // 世界观关系
+  for (const mw of matchResult.worldSettings) {
+    if (!mw._selected || !mw.relations?.length) continue;
+    const key = mw.name.trim().toLowerCase();
+    const setting = updatedSettings.get(key) || settingNameMap.get(key);
+    if (!setting) continue;
+    for (const er of mw.relations) {
+      const target = settingNameMap.get(er.targetName.trim().toLowerCase());
+      if (!target || target.id === setting.id) continue;
+      if (setting.relations.some((r) => r.targetId === target.id && r.type === er.type)) continue;
+      setting.relations.push({ targetId: target.id, type: er.type });
+      stats.worldSettingRelationsAdded++;
+    }
+    if (mw.relations.length > 0) await db.worldSettings.update(setting);
+  }
+
+  // 伏笔
+  const existingFShadowContents = new Set(existingForeshadows.map((f) => f.content.trim().toLowerCase()));
+  for (const mf of matchResult.foreshadows) {
+    if (!mf._selected) continue;
+    const key = mf.content.trim().toLowerCase();
+    if (!existingFShadowContents.has(key)) {
+      await db.foreshadows.add({ id: generateId(), projectId, content: mf.content, firstAppearance: '', status: 'pending', relatedCharacters: [], notes: `AI 分析置信度：${mf.confidence}` });
+      stats.foreshadowsAdded++;
+    }
+  }
+
+  return stats;
+}
+
 // ========== 创作建议 ==========
 
 export async function getWritingSuggestions(context: {
