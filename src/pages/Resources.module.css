@@ -230,9 +230,32 @@
   flex: 1.5;
 }
 
+.colStatus {
+  flex: 0.8;
+}
+
 .colCost {
   flex: 1;
   color: var(--text-secondary);
+}
+
+/* ========== 状态标签 ========== */
+.resStatus {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.status未获得 { background: rgba(160,155,147,0.12); color: #a09b93; }
+.status已获得 { background: rgba(90,158,111,0.12); color: #5a9e6f; }
+.status已消耗 { background: rgba(196,75,75,0.12); color: #c44b4b; }
+.status进行中 { background: rgba(201,158,75,0.12); color: #c99e4b; }
+
+.resObtained {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
 }
 
 .resNameText {

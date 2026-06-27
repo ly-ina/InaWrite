@@ -8,7 +8,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useCharacterStore } from '../store/characterStore';
 import { useChapterStore } from '../store/chapterStore';
 import { useAppStore } from '../store/appStore';
-import { generateId, type Character, type Resource } from '../types';
+import { generateId, type Character, type Resource, type ResourceStatus } from '../types';
 import styles from './Resources.module.css';
 
 type ViewMode = 'byCharacter' | 'global';
@@ -23,11 +23,14 @@ export default function ResourcesPage() {
   const [filterType, setFilterType] = useState('');
   const [showAdd, setShowAdd] = useState(false);
 
-  // 新资源表单
+  // 资源表单（新增/编辑共用）
+  const [editingResId, setEditingResId] = useState<string | null>(null);
   const [resName, setResName] = useState('');
-  const [resType, setResType] = useState('');
+  const [resType, setResType] = useState<Resource['type']>('能力');
   const [resDesc, setResDesc] = useState('');
   const [resCost, setResCost] = useState('');
+  const [resStatus, setResStatus] = useState<ResourceStatus>('已获得');
+  const [resObtainedAt, setResObtainedAt] = useState('');
 
   useEffect(() => {
     if (currentProject) {
@@ -58,25 +61,58 @@ export default function ResourcesPage() {
     return result;
   }, [characters, filterType]);
 
-  // 添加资源
-  const handleAdd = async () => {
-    if (!resName.trim() || !selectedChar) return;
-    const newRes: Resource = {
-      id: generateId(),
-      name: resName.trim(),
-      type: (resType || '其他') as Resource['type'],
-      description: resDesc.trim(),
-      status: '已获得',
-      cost: resCost || undefined,
-    };
-    const updated = { ...selectedChar, resources: [...selectedChar.resources, newRes] };
-    await updateCharacter(updated);
-    await loadCharacters(currentProject!.id);
+  const resetForm = () => {
     setShowAdd(false);
+    setEditingResId(null);
     setResName('');
-    setResType('');
+    setResType('能力');
     setResDesc('');
     setResCost('');
+    setResStatus('已获得');
+    setResObtainedAt('');
+  };
+
+  const openEdit = (res: Resource) => {
+    setEditingResId(res.id);
+    setResName(res.name);
+    setResType(res.type || '能力');
+    setResDesc(res.description);
+    setResCost(res.cost || '');
+    setResStatus(res.status);
+    setResObtainedAt(res.obtainedAt || '');
+    setShowAdd(true);
+  };
+
+  // 保存资源（新增/编辑）
+  const handleSave = async () => {
+    if (!resName.trim() || !selectedChar) return;
+    if (editingResId) {
+      // 编辑已有
+      const updated = {
+        ...selectedChar,
+        resources: selectedChar.resources.map((r) =>
+          r.id === editingResId
+            ? { ...r, name: resName.trim(), type: resType, description: resDesc.trim(), status: resStatus, cost: resCost || undefined, obtainedAt: resObtainedAt || undefined }
+            : r
+        ),
+      };
+      await updateCharacter(updated);
+    } else {
+      // 新增
+      const newRes: Resource = {
+        id: generateId(),
+        name: resName.trim(),
+        type: resType,
+        description: resDesc.trim(),
+        status: resStatus,
+        cost: resCost || undefined,
+        obtainedAt: resObtainedAt || undefined,
+      };
+      const updated = { ...selectedChar, resources: [...selectedChar.resources, newRes] };
+      await updateCharacter(updated);
+    }
+    await loadCharacters(currentProject!.id);
+    resetForm();
   };
 
   // 删除资源
@@ -102,7 +138,7 @@ export default function ResourcesPage() {
             <option value="global">全局资源表</option>
           </select>
           {viewMode === 'byCharacter' && selectedChar && (
-            <button className="btn btn-primary" onClick={() => setShowAdd(true)}>
+            <button className="btn btn-primary" onClick={() => { resetForm(); setShowAdd(true); }}>
               + 添加资源
             </button>
           )}
@@ -151,10 +187,10 @@ export default function ResourcesPage() {
                   </div>
                 </div>
 
-                {selectedChar.resources.length === 0 ? (
+                {selectedChar.resources.length === 0 && !showAdd ? (
                   <div className="empty-state" style={{ padding: '30px' }}>
                     <p>该角色还没有资源/能力</p>
-                    <button className="btn btn-primary btn-sm" onClick={() => setShowAdd(true)}>
+                    <button className="btn btn-primary btn-sm" onClick={() => { resetForm(); setShowAdd(true); }}>
                       + 添加资源
                     </button>
                   </div>
@@ -165,9 +201,15 @@ export default function ResourcesPage() {
                         <div className={styles.resHeader}>
                           <span className={styles.resName}>{res.name}</span>
                           <span className={styles.resType}>{res.type}</span>
+                          <span className={`${styles.resStatus} ${styles[`status${res.status}`] || ''}`}>
+                            {res.status}
+                          </span>
                         </div>
                         {res.description && (
                           <div className={styles.resDesc}>{res.description}</div>
+                        )}
+                        {res.obtainedAt && (
+                          <div className={styles.resObtained}>📅 {res.obtainedAt}</div>
                         )}
                         {res.cost && (
                           <div className={styles.resCost}>
@@ -175,23 +217,32 @@ export default function ResourcesPage() {
                             {res.cost}
                           </div>
                         )}
-                        <button
-                          className="btn btn-sm btn-ghost"
-                          onClick={() => handleDelete(res.id)}
-                          style={{ color: 'var(--danger)', fontSize: '11px', marginTop: '8px' }}
-                        >
-                          删除
-                        </button>
+                        <div style={{ display: 'flex', gap: '4px', marginTop: '8px' }}>
+                          <button
+                            className="btn btn-sm btn-ghost"
+                            onClick={() => openEdit(res)}
+                            style={{ color: 'var(--accent)', fontSize: '11px' }}
+                          >
+                            编辑
+                          </button>
+                          <button
+                            className="btn btn-sm btn-ghost"
+                            onClick={() => handleDelete(res.id)}
+                            style={{ color: 'var(--danger)', fontSize: '11px' }}
+                          >
+                            删除
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
                 )}
 
-                {/* 添加资源弹窗 */}
+                {/* 添加/编辑资源弹窗 */}
                 {showAdd && (
-                  <div className="modal-overlay" onClick={() => setShowAdd(false)}>
+                  <div className="modal-overlay" onClick={resetForm}>
                     <div className="modal" onClick={(e) => e.stopPropagation()}>
-                      <h2>为「{selectedChar.name}」添加资源</h2>
+                      <h2>{editingResId ? '编辑资源' : `为「${selectedChar.name}」添加资源`}</h2>
                       <div className="form-group">
                         <label>名称 *</label>
                         <input className="input" value={resName} onChange={(e) => setResName(e.target.value)}
@@ -199,16 +250,34 @@ export default function ResourcesPage() {
                       </div>
                       <div className="form-group">
                         <label>类型</label>
-                        <input className="input" value={resType} onChange={(e) => setResType(e.target.value)}
-                          placeholder="武器/技能/魔法/道具..." list="res-types" />
-                        <datalist id="res-types">
-                          {allTypes.map((t) => <option key={t} value={t} />)}
-                        </datalist>
+                        <select className="select" value={resType}
+                          onChange={(e) => setResType(e.target.value as Resource['type'])}>
+                          <option value="能力">能力</option>
+                          <option value="物品">物品</option>
+                          <option value="代价">代价</option>
+                          <option value="其他">其他</option>
+                        </select>
+                      </div>
+                      <div className="form-group">
+                        <label>状态</label>
+                        <select className="select" value={resStatus}
+                          onChange={(e) => setResStatus(e.target.value as ResourceStatus)}>
+                          <option value="未获得">未获得</option>
+                          <option value="已获得">已获得</option>
+                          <option value="已消耗">已消耗</option>
+                          <option value="进行中">进行中</option>
+                        </select>
                       </div>
                       <div className="form-group">
                         <label>描述</label>
                         <textarea className="textarea" value={resDesc}
                           onChange={(e) => setResDesc(e.target.value)} rows={3} />
+                      </div>
+                      <div className="form-group">
+                        <label>获取时间/章节</label>
+                        <input className="input" value={resObtainedAt}
+                          onChange={(e) => setResObtainedAt(e.target.value)}
+                          placeholder="可选" />
                       </div>
                       <div className="form-group">
                         <label>代价</label>
@@ -217,8 +286,10 @@ export default function ResourcesPage() {
                           placeholder="使用代价（可选）" />
                       </div>
                       <div className="form-actions">
-                        <button className="btn" onClick={() => setShowAdd(false)}>取消</button>
-                        <button className="btn btn-primary" onClick={handleAdd} disabled={!resName.trim()}>添加</button>
+                        <button className="btn" onClick={resetForm}>取消</button>
+                        <button className="btn btn-primary" onClick={handleSave} disabled={!resName.trim()}>
+                          {editingResId ? '保存' : '添加'}
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -234,7 +305,11 @@ export default function ResourcesPage() {
             <select className="select" value={filterType}
               onChange={(e) => setFilterType(e.target.value)}>
               <option value="">全部类型</option>
-              {allTypes.map((t) => <option key={t} value={t}>{t}</option>)}
+              <option value="能力">能力</option>
+              <option value="物品">物品</option>
+              <option value="代价">代价</option>
+              <option value="其他">其他</option>
+              {allTypes.filter((t) => !['能力', '物品', '代价', '其他'].includes(t)).map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
             <span className={styles.globalCount}>共 {globalResources.length} 项</span>
           </div>
@@ -249,6 +324,7 @@ export default function ResourcesPage() {
               <div className={styles.tableHeader}>
                 <span className={styles.colName}>名称</span>
                 <span className={styles.colType}>类型</span>
+                <span className={styles.colStatus}>状态</span>
                 <span className={styles.colChar}>所属角色</span>
                 <span className={styles.colCost}>代价</span>
               </div>
@@ -260,6 +336,9 @@ export default function ResourcesPage() {
                   </span>
                   <span className={styles.colType}>
                     <span className={styles.resType}>{res.type}</span>
+                  </span>
+                  <span className={styles.colStatus}>
+                    <span className={`${styles.resStatus} ${styles[`status${res.status}`] || ''}`}>{res.status}</span>
                   </span>
                   <span className={styles.colChar}>
                     <span className={styles.charLink} onClick={() => {
