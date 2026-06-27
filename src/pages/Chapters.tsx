@@ -1,15 +1,26 @@
 /**
  * 章节管理页面
- * 显示章节列表，支持增删改查、筛选排序
+ * 显示章节列表，支持增删改查、正文编辑、字数统计、草稿功能
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { useChapterStore } from '../store/chapterStore';
 import { useCharacterStore } from '../store/characterStore';
 import { useForeshadowStore } from '../store/foreshadowStore';
 import { useAppStore } from '../store/appStore';
 import { STATUS_LABELS, type Chapter } from '../types';
+import MarkdownEditor from '../components/MarkdownEditor';
+import ConfirmDialog from '../components/ConfirmDialog';
 import styles from './Chapters.module.css';
+
+/** 统计中文字数 */
+function countChineseWords(text: string): number {
+  const chinese = text.match(/[\u4e00-\u9fff]/g);
+  const words = text.match(/[a-zA-Z0-9]+/g);
+  return (chinese?.length || 0) + (words?.reduce((sum, w) => sum + Math.ceil(w.length / 5), 0) || 0);
+}
 
 export default function ChaptersPage() {
   const { currentProject, refreshKey } = useAppStore();
@@ -31,10 +42,21 @@ export default function ChaptersPage() {
   const [formWordCount, setFormWordCount] = useState('');
   const [formStatus, setFormStatus] = useState<Chapter['status']>('draft');
   const [formSummary, setFormSummary] = useState('');
+  const [formContent, setFormContent] = useState('');
   const [formKeyEvents, setFormKeyEvents] = useState('');
   const [formCharacters, setFormCharacters] = useState<string[]>([]);
   const [formForeshadowsAdded, setFormForeshadowsAdded] = useState<string[]>([]);
   const [formForeshadowsResolved, setFormForeshadowsResolved] = useState<string[]>([]);
+
+  // 确认弹窗
+  const [confirmDialog, setConfirmDialog] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
+
+  // 独立草稿编辑器（全屏模式）
+  const [draftMode, setDraftMode] = useState(false);
+  const [draftChapterId, setDraftChapterId] = useState<string | null>(null);
+  const [draftContent, setDraftContent] = useState('');
+  const [draftTitle, setDraftTitle] = useState('');
+  const [draftWordCount, setDraftWordCount] = useState(0);
 
   useEffect(() => {
     if (currentProject) {
@@ -59,6 +81,7 @@ export default function ChaptersPage() {
     setFormTitle('');
     setFormNumber((chapters.length || 0) + 1);
     setFormWordCount('');
+    setFormContent('');
     setFormStatus('draft');
     setFormSummary('');
     setFormKeyEvents('');
@@ -70,13 +93,15 @@ export default function ChaptersPage() {
   // 创建章节
   const handleCreate = async () => {
     if (!formTitle.trim() || !currentProject) return;
+    const wc = countChineseWords(formContent);
     const chapter = await createChapter({
       projectId: currentProject.id,
       number: formNumber,
       title: formTitle.trim(),
-      wordCount: formWordCount ? parseInt(formWordCount) : undefined,
+      wordCount: wc || formWordCount ? parseInt(formWordCount) : undefined,
       status: formStatus,
       summary: formSummary.trim() || undefined,
+      content: formContent.trim() || undefined,
       keyEvents: formKeyEvents.split('\n').filter(Boolean),
       characters: formCharacters,
       foreshadowsAdded: formForeshadowsAdded,
@@ -97,12 +122,38 @@ export default function ChaptersPage() {
     setEditingChapter(null);
   };
 
+  // 打开草稿编辑器
+  const openDraft = (ch: Chapter) => {
+    setDraftChapterId(ch.id);
+    setDraftTitle(ch.title);
+    setDraftContent(ch.content || '');
+    setDraftWordCount(countChineseWords(ch.content || ''));
+    setDraftMode(true);
+  };
+
+  // 保存草稿
+  const saveDraft = async () => {
+    if (!draftChapterId || !currentProject) return;
+    const ch = chapters.find((c) => c.id === draftChapterId);
+    if (!ch) return;
+    const wc = countChineseWords(draftContent);
+    await updateChapter({ ...ch, content: draftContent, wordCount: wc || ch.wordCount });
+    await loadChapters(currentProject.id);
+    setDraftMode(false);
+  };
+
   // 删除章节
-  const handleDelete = async (id: string, title: string) => {
-    if (!window.confirm(`确定要删除章节「${title}」吗？`)) return;
-    await deleteChapter(id);
-    if (selectedId === id) setSelectedId(null);
-    await loadChapters(currentProject!.id);
+  const handleDelete = (id: string, title: string) => {
+    setConfirmDialog({
+      title: '删除章节',
+      message: `确定要删除章节「${title}」吗？`,
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        await deleteChapter(id);
+        if (selectedId === id) setSelectedId(null);
+        await loadChapters(currentProject!.id);
+      },
+    });
   };
 
   // 切换多选
@@ -199,6 +250,15 @@ export default function ChaptersPage() {
                 </select>
               </div>
               <div className="form-group">
+                <label>正文（Markdown）</label>
+                <MarkdownEditor
+                  value={editingChapter.content || ''}
+                  onChange={(v) => setEditingChapter({ ...editingChapter, content: v, wordCount: countChineseWords(v) || editingChapter.wordCount })}
+                  rows={12}
+                  label={`字数：${countChineseWords(editingChapter.content || '').toLocaleString()}`}
+                />
+              </div>
+              <div className="form-group">
                 <label>摘要</label>
                 <textarea className="textarea" value={editingChapter.summary || ''}
                   onChange={(e) => setEditingChapter({ ...editingChapter, summary: e.target.value })} rows={4} />
@@ -216,15 +276,31 @@ export default function ChaptersPage() {
                   <div className={styles.chapterBadge}>第{selectedChapter.number}章</div>
                   <h2>{selectedChapter.title}</h2>
                   <div className={styles.detailMeta}>
-                    {selectedChapter.wordCount && <span>{selectedChapter.wordCount.toLocaleString()} 字</span>}
+                    <span>{countChineseWords(selectedChapter.content || '').toLocaleString()} 字</span>
+                    {selectedChapter.wordCount && <span>（标注 {selectedChapter.wordCount.toLocaleString()} 字）</span>}
                     <span className={`tag tag-${selectedChapter.status}`}>{STATUS_LABELS[selectedChapter.status]}</span>
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '6px' }}>
+                  <button className="btn btn-sm" onClick={() => openDraft(selectedChapter)}>✍️ 草稿</button>
                   <button className="btn btn-sm" onClick={() => setEditingChapter({ ...selectedChapter })}>编辑</button>
                   <button className="btn btn-danger btn-sm" onClick={() => handleDelete(selectedChapter.id, selectedChapter.title)}>删除</button>
                 </div>
               </div>
+
+              {/* 正文展示 */}
+              {selectedChapter.content ? (
+                <section className={styles.section}>
+                  <h3>正文</h3>
+                  <div className={styles.contentPreview}>
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{selectedChapter.content}</ReactMarkdown>
+                  </div>
+                </section>
+              ) : (
+                <section className={styles.section}>
+                  <div className={styles.emptyContent}>📝 暂无正文，点击「✍️ 草稿」开始写作</div>
+                </section>
+              )}
 
               {selectedChapter.summary && (
                 <section className={styles.section}>
@@ -317,6 +393,15 @@ export default function ChaptersPage() {
               </select>
             </div>
             <div className="form-group">
+              <label>正文（Markdown）</label>
+              <MarkdownEditor
+                value={formContent}
+                onChange={(v) => { setFormContent(v); setFormWordCount(String(countChineseWords(v))); }}
+                rows={8}
+                label={`字数：${countChineseWords(formContent).toLocaleString()}`}
+              />
+            </div>
+            <div className="form-group">
               <label>内容摘要</label>
               <textarea className="textarea" value={formSummary}
                 onChange={(e) => setFormSummary(e.target.value)} rows={3} placeholder="简单描述本章内容..." />
@@ -357,6 +442,48 @@ export default function ChaptersPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* 草稿编辑器弹窗（全屏） */}
+      {draftMode && (
+        <div className="modal-overlay" onClick={() => setDraftMode(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{
+            minWidth: '90vw', maxWidth: '95vw', maxHeight: '90vh',
+            display: 'flex', flexDirection: 'column',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+              <h2 style={{ margin: 0 }}>✍️ 草稿 — {draftTitle}</h2>
+              <span style={{ fontSize: '13px', color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>
+                {draftWordCount.toLocaleString()} 字
+              </span>
+            </div>
+            <MarkdownEditor
+              value={draftContent}
+              onChange={(v) => { setDraftContent(v); setDraftWordCount(countChineseWords(v)); }}
+              rows={25}
+            />
+            <div className="form-actions">
+              <button className="btn" onClick={() => setDraftMode(false)}>关闭</button>
+              <span style={{ flex: 1 }} />
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                实时字数：{draftWordCount.toLocaleString()} 字
+              </span>
+              <button className="btn btn-primary" onClick={saveDraft}>💾 保存草稿</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 确认弹窗 */}
+      {confirmDialog && (
+        <ConfirmDialog
+          title={confirmDialog.title}
+          message={confirmDialog.message}
+          danger
+          confirmLabel="确认删除"
+          onConfirm={confirmDialog.onConfirm}
+          onCancel={() => setConfirmDialog(null)}
+        />
       )}
     </div>
   );
