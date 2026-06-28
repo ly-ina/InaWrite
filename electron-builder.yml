@@ -8,6 +8,7 @@ files:
   - dist-electron/**/*
   - public/**/*
   - package.json
+  # 主进程只用 electron/fs/path 内置模块，不需要 node_modules
 win:
   target: [dir]
 mac:
