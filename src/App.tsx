@@ -48,25 +48,41 @@ function AppRoutes() {
   const [updateStatus, setUpdateStatus] = useState('');
 
   // OTA 更新检测
-  const doUpdateCheck = useCallback(async () => {
+  const doUpdateCheck = useCallback(async (silent = false) => {
     const isNative = !!(window as any).Capacitor?.isNativePlatform?.();
     const isElectron = !!(window as any).electronBridge?.isElectron;
-    if (!isNative && !isElectron) return; // 浏览器环境跳过
-
-    console.log('[OTA] 检查更新...');
-    const info = await checkForUpdate();
-    if (info) {
-      console.log('[OTA] 发现新版本:', info.version, 'platform:', info.fileExt);
-      setUpdateInfo({
-        version: info.version,
-        changelog: info.changelog,
-        downloadUrl: info.downloadUrl,
-      });
-      setUpdateDialog(true);
-    } else {
-      console.log('[OTA] 已是最新版本');
+    if (!isNative && !isElectron) {
+      if (!silent) alert('当前为浏览器环境，无法检测更新');
+      return 'web';
     }
+
+    // 检查是否已跳过此版本
+    const skippedVersion = localStorage.getItem('inakb_skip_update');
+    const info = await checkForUpdate();
+    if (!info) {
+      if (!silent) alert('已是最新版本');
+      return null;
+    }
+    if (info.versionCode.toString() === skippedVersion && silent) return null;
+
+    console.log('[OTA] 发现新版本:', info.version, 'platform:', info.fileExt);
+    setUpdateInfo({
+      version: info.version,
+      changelog: info.changelog,
+      downloadUrl: info.downloadUrl,
+      fileExt: info.fileExt,
+    });
+    setUpdateDialog(true);
+    return 'found';
   }, []);
+
+  // 跳过此版本
+  const skipUpdate = () => {
+    if (updateInfo) {
+      localStorage.setItem('inakb_skip_update', updateInfo.version.replace(/[^0-9]/g, '') || String(Date.now()));
+    }
+    setUpdateDialog(false);
+  };
 
   // 下载并安装更新
   const handleDownloadUpdate = async () => {
@@ -85,7 +101,6 @@ function AppRoutes() {
         setUpdateStatus('下载完成，准备安装...');
         setTimeout(() => installApk(result.uri), 500);
       } else {
-        // PC: 浏览器下载已完成，提示用户
         setUpdateStatus('下载完成！请关闭应用后用新版本 exe 替换旧版');
       }
     } catch (err: any) {
@@ -94,9 +109,15 @@ function AppRoutes() {
     }
   };
 
-  // 启动时检查更新（延迟 3 秒，等应用初始化完成）
+  // 暴露给 About 页面调用
   useEffect(() => {
-    const timer = setTimeout(doUpdateCheck, 3000);
+    (window as any).__inakbCheckUpdate = () => doUpdateCheck(false);
+    return () => { delete (window as any).__inakbCheckUpdate; };
+  }, [doUpdateCheck]);
+
+  // 启动时检查更新（延迟 3 秒，静默模式）
+  useEffect(() => {
+    const timer = setTimeout(() => doUpdateCheck(true), 3000);
     return () => clearTimeout(timer);
   }, [doUpdateCheck]);
 
@@ -205,16 +226,33 @@ function AppRoutes() {
         />
       )}
 
-      {/* OTA 更新弹窗 */}
+      {/* OTA 更新弹窗（三按钮：立即更新 / 稍后 / 不再提醒） */}
       {updateDialog && updateInfo && (
-        <ConfirmDialog
-          title="发现新版本"
-          message={`版本: ${updateInfo.version}${updateInfo.changelog ? '\n\n更新内容:\n' + updateInfo.changelog : ''}`}
-          confirmLabel={isDownloading ? `下载中 ${updateProgress}%` : '立即更新'}
-          cancelLabel="稍后"
-          onConfirm={handleDownloadUpdate}
-          onCancel={() => setUpdateDialog(false)}
-        />
+        <div className="modal-overlay" onClick={() => setUpdateDialog(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div style={{ textAlign: 'center', fontSize: '32px', marginBottom: '8px' }}>🆕</div>
+            <h3 style={{ textAlign: 'center', marginBottom: '8px' }}>发现新版本</h3>
+            <p style={{ textAlign: 'center', fontSize: '18px', fontWeight: 600, marginBottom: '12px' }}>
+              {updateInfo.version}
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginLeft: '6px' }}>
+                ({updateInfo.fileExt === '.exe' ? 'PC版' : 'Android版'})
+              </span>
+            </p>
+            {updateInfo.changelog && (
+              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', marginBottom: '14px', maxHeight: '120px', overflow: 'auto' }}>
+                {updateInfo.changelog}
+              </p>
+            )}
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+              <button className="btn" onClick={skipUpdate} style={{ fontSize: '12px' }}>不再提醒</button>
+              <button className="btn" onClick={() => setUpdateDialog(false)} style={{ fontSize: '12px' }}>稍后</button>
+              <button className="btn btn-primary" onClick={handleDownloadUpdate} disabled={isDownloading}
+                style={{ fontSize: '12px' }}>
+                {isDownloading ? `下载中 ${updateProgress}%` : '立即更新'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* 更新状态提示 */}

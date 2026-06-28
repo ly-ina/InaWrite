@@ -1,13 +1,28 @@
 /**
  * 关于页面
- * 展示作者信息、项目链接、使用说明等
+ * 展示作者信息、项目链接、使用说明、版本检测
  */
 
+import { useState } from 'react';
 import { useT } from '../i18n';
+import { getCurrentVersion } from '../utils/updater';
 import styles from './About.module.css';
 
 export default function AboutPage() {
   const { t } = useT();
+  const [checking, setChecking] = useState(false);
+
+  const handleCheckUpdate = async () => {
+    setChecking(true);
+    try {
+      const fn = (window as any).__inakbCheckUpdate;
+      if (fn) await fn();
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  const ver = getCurrentVersion();
 
   return (
     <div className={styles.page}>
@@ -18,7 +33,18 @@ export default function AboutPage() {
           <div className={styles.logo}>📖</div>
           <h1 className={styles.title}>Novel InaKB</h1>
           <p className={styles.subtitle}>{t('about.tagline')}</p>
-          <p className={styles.version}>v1.0.0</p>
+          <p className={styles.version}>v{ver.versionName} (code {ver.versionCode})</p>
+          <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+            {ver.platform === 'android' ? '📱 Android' : ver.platform === 'pc' ? '🖥️ PC (Electron)' : '🌐 Web'}
+          </p>
+          <button
+            className="btn btn-primary"
+            onClick={handleCheckUpdate}
+            disabled={checking}
+            style={{ marginTop: '10px' }}
+          >
+            {checking ? '⏳ 检测中...' : '🔍 检查更新'}
+          </button>
         </div>
 
         {/* 作者信息 */}
