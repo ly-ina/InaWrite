@@ -9,6 +9,7 @@ import { useCharacterStore } from '../store/characterStore';
 import { useWorldSettingStore } from '../store/worldSettingStore';
 import { useForeshadowStore } from '../store/foreshadowStore';
 import { useChapterStore } from '../store/chapterStore';
+import { useT } from '../i18n';
 import {
   getAIConfig, updateAIConfig,
   getWritingSuggestions, analyzeNovelText, analyzeResourceUpdates,
@@ -38,6 +39,7 @@ export default function AIAssistantPage() {
   const { settings, loadSettings } = useWorldSettingStore();
   const { foreshadows, loadForeshadows } = useForeshadowStore();
   const { chapters, loadChapters } = useChapterStore();
+  const { t, lang } = useT();
 
   // 从 localStorage 同步读取初始 activeTab，避免闪烁
   const [activeTab, setActiveTab] = useState<TabKey>(() => {
@@ -259,12 +261,12 @@ export default function AIAssistantPage() {
       addAIHistory({
         projectId: currentProject.id,
         type: 'analyze',
-        label: '文本分析',
-        summary: `提取了 ${matched.characters.length} 个角色、${matched.worldSettings.length} 个设定、${matched.foreshadows.length} 个伏笔（新增 ${newCount} 项）`,
+        label: t('ai.tab.analyze'),
+        summary: `${t('ai.tab.analyze')}: ${matched.characters.length} ${t('nav.characters')}, ${matched.worldSettings.length} ${t('nav.worldsettings')}, ${matched.foreshadows.length} ${t('nav.foreshadows')} (${newCount} ${t('ai.matchNew')})`,
         detail: { inputPreview: inputText.slice(0, 200) },
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : '分析失败');
+      setError(err instanceof Error ? err.message : t('ai.analyzeFailed'));
     } finally {
       setLoading(false);
     }
@@ -325,7 +327,7 @@ export default function AIAssistantPage() {
       await loadSettings(currentProject.id);
       await loadForeshadows(currentProject.id);
     } catch (err) {
-      setError(err instanceof Error ? err.message : '应用失败');
+      setError(err instanceof Error ? err.message : t('ai.applyFailed'));
     } finally {
       setLoading(false);
     }
@@ -365,11 +367,11 @@ export default function AIAssistantPage() {
       addAIHistory({
         projectId: currentProject.id,
         type: 'suggest',
-        label: '创作建议',
+        label: t('ai.tab.suggest'),
         summary: result.slice(0, 200) + (result.length > 200 ? '...' : ''),
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : '请求失败');
+      setError(err instanceof Error ? err.message : t('ai.requestFailed'));
     } finally {
       setLoading(false);
     }
@@ -379,7 +381,7 @@ export default function AIAssistantPage() {
   const handleResourceScan = async () => {
     if (!currentProject) return;
     const chapter = chapters.find((c) => c.id === selectedChapterId);
-    if (!chapter) { setError('请先选择一个章节'); return; }
+    if (!chapter) { setError(t('ai.selectChapter')); return; }
     setLoading(true);
     setError('');
     setResourceUpdates([]);
@@ -397,12 +399,12 @@ export default function AIAssistantPage() {
       addAIHistory({
         projectId: currentProject.id,
         type: 'resources',
-        label: '资源扫描',
+        label: t('ai.tab.resources'),
         summary: `检测到 ${updates.length} 项资源状态变化`,
         detail: { updates },
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : '分析失败');
+      setError(err instanceof Error ? err.message : t('ai.analyzeFailed'));
     } finally {
       setLoading(false);
     }
@@ -416,9 +418,9 @@ export default function AIAssistantPage() {
       setResourceUpdates([]);
       triggerRefresh();
       await loadCharacters(currentProject.id);
-      alert(`已更新 ${count} 项资源状态`);
+      alert(t('ai.updated').replace('{n}', String(count)));
     } catch (err) {
-      setError(err instanceof Error ? err.message : '更新失败');
+      setError(err instanceof Error ? err.message : t('ai.applyFailed'));
     } finally {
       setLoading(false);
     }
@@ -446,7 +448,7 @@ export default function AIAssistantPage() {
       );
       setArcResult(result);
     } catch (err) {
-      setError(err instanceof Error ? err.message : '分析失败');
+      setError(err instanceof Error ? err.message : t('ai.analyzeFailed'));
     } finally {
       setLoading(false);
     }
@@ -456,7 +458,7 @@ export default function AIAssistantPage() {
   const handleContinue = async () => {
     if (!currentProject || !continueChapterId) return;
     const lastChapter = chapters.find((c) => c.id === continueChapterId);
-    if (!lastChapter) { setError('请选择上一章'); return; }
+    if (!lastChapter) { setError(t('ai.prevChapter')); return; }
     setLoading(true);
     setError('');
     setContinueResult(null);
@@ -475,12 +477,12 @@ export default function AIAssistantPage() {
       addAIHistory({
         projectId: currentProject.id,
         type: 'continue',
-        label: '章节续写',
+        label: t('ai.tab.continue'),
         summary: `续写「${result.title}」（${result.wordCount}字）`,
         detail: { title: result.title, contentPreview: result.content.slice(0, 200) },
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : '续写失败');
+      setError(err instanceof Error ? err.message : t('ai.continueFailed'));
     } finally {
       setLoading(false);
     }
@@ -505,7 +507,7 @@ export default function AIAssistantPage() {
     });
     await loadChapters(currentProject.id);
     triggerRefresh();
-    alert(`已保存为第${nextNumber}章「${continueResult.title}」`);
+    alert(t('ai.saveAsChapter') + `: ${t('ai.chapterNum')}${nextNumber}${t('chap.number')}「${continueResult.title}」`);
   };
 
   // ===== V4.2 一致性检查 =====
@@ -525,12 +527,12 @@ export default function AIAssistantPage() {
       addAIHistory({
         projectId: currentProject.id,
         type: 'consistency',
-        label: '一致性检查',
+        label: t('ai.tab.consistency'),
         summary: `评分 ${report.score}/100，发现 ${report.issues.length} 个问题`,
         detail: { score: report.score, issueCount: report.issues.length },
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : '检查失败');
+      setError(err instanceof Error ? err.message : t('ai.checkFailed'));
     } finally {
       setLoading(false);
     }
@@ -553,12 +555,12 @@ export default function AIAssistantPage() {
       addAIHistory({
         projectId: currentProject.id,
         type: 'complete',
-        label: '世界观补全',
+        label: t('ai.tab.complete'),
         summary: `${result.summary.slice(0, 200)}（${result.suggestions.length} 条建议）`,
         detail: { suggestionCount: result.suggestions.length },
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : '补全失败');
+      setError(err instanceof Error ? err.message : t('ai.completeFailed'));
     } finally {
       setLoading(false);
     }
@@ -572,22 +574,22 @@ export default function AIAssistantPage() {
 
   const handleCreateSnapshot = async () => {
     if (!currentProject) return;
-    const label = prompt('快照标签（可选）：', `手动快照 ${new Date().toLocaleString('zh-CN')}`);
+    const label = prompt(t('ai.snapshotLabel'), t('ai.snapshotLabel').replace('{date}', new Date().toLocaleString(lang === 'zh' ? 'zh-CN' : 'en-US')));
     await createSnapshot(currentProject.id, label || undefined);
     loadSnapshots();
-    alert('快照已创建！');
+    alert(t('ai.createSnapshot') + ' ✅');
   };
 
   const handleRestoreSnapshot = async (snapshot: DataSnapshot) => {
-    if (!confirm(`确定恢复快照「${snapshot.label}」？当前数据将被覆盖。`)) return;
+    if (!confirm(t('ai.confirmRestoreSnapshot').replace('{label}', snapshot.label))) return;
     await restoreSnapshot(snapshot);
     triggerRefresh();
-    alert('数据已恢复，页面将刷新。');
+    alert(t('ai.restored'));
     window.location.reload();
   };
 
   const handleDeleteSnapshot = (id: string) => {
-    if (!currentProject || !confirm('删除此快照？')) return;
+    if (!currentProject || !confirm(t('ai.confirmDeleteSnapshot'))) return;
     deleteSnapshot(currentProject.id, id);
     loadSnapshots();
   };
@@ -601,27 +603,27 @@ export default function AIAssistantPage() {
   };
 
   if (!currentProject) {
-    return <div className="empty-state"><div className="icon">🤖</div><p>请先选择一个作品</p></div>;
+    return <div className="empty-state"><div className="icon">🤖</div><p>{t('common.selectProject')}</p></div>;
   }
 
   return (
     <div className={styles.page}>
       <div className="page-header">
-        <h1>🤖 AI 写作助手</h1>
+        <h1>🤖 {t('ai.title')}</h1>
       </div>
 
       {/* 标签页切换 */}
       <div className={styles.tabs}>
         {([
-          { key: 'analyze', label: '📖 文本分析', desc: '导入文本，AI 自动提取角色、世界观、伏笔' },
-          { key: 'suggest', label: '💡 创作建议', desc: '根据当前进度获取写作指导' },
-          { key: 'continue', label: '✍️ 章节续写', desc: 'AI 根据上一章内容和设定续写下一章' },
-          { key: 'resources', label: '🔄 资源追踪', desc: '根据章节内容智能更新角色资源状态' },
-          { key: 'consistency', label: '🔍 一致性检查', desc: '扫描全文检测设定矛盾' },
-          { key: 'complete', label: '🌐 世界观补全', desc: 'AI 根据已有设定推断和补全' },
-          { key: 'history', label: '📋 操作历史', desc: '查看历次 AI 操作记录' },
-          { key: 'snapshots', label: '📜 版本快照', desc: '数据快照与版本管理' },
-          { key: 'settings', label: '⚙️ 设置', desc: '配置 API 和模型' },
+          { key: 'analyze', label: t('ai.tab.analyze'), desc: t('ai.tab.analyzeDesc') },
+          { key: 'suggest', label: t('ai.tab.suggest'), desc: t('ai.tab.suggestDesc') },
+          { key: 'continue', label: t('ai.tab.continue'), desc: t('ai.tab.continueDesc') },
+          { key: 'resources', label: t('ai.tab.resources'), desc: t('ai.tab.resourcesDesc') },
+          { key: 'consistency', label: t('ai.tab.consistency'), desc: t('ai.tab.consistencyDesc') },
+          { key: 'complete', label: t('ai.tab.complete'), desc: t('ai.tab.completeDesc') },
+          { key: 'history', label: t('ai.tab.history'), desc: t('ai.tab.historyDesc') },
+          { key: 'snapshots', label: t('ai.tab.snapshots'), desc: t('ai.tab.snapshotsDesc') },
+          { key: 'settings', label: t('ai.tab.settings'), desc: t('ai.tab.settingsDesc') },
         ] as const).map((tab) => (
           <button
             key={tab.key}
@@ -646,14 +648,14 @@ export default function AIAssistantPage() {
         <div className={styles.tabContent}>
           <div className={styles.inputSection}>
             <div className={styles.inputHeader}>
-              <h3>导入小说文本</h3>
+              <h3>{t('ai.inputText')}</h3>
               <div style={{ display: 'flex', gap: '6px' }}>
                 <button className="btn btn-sm" onClick={() => fileInputRef.current?.click()}>
-                  📁 选择文件
+                  {t('ai.chooseFile')}
                 </button>
                 <input ref={fileInputRef} type="file" accept=".txt,.md" style={{ display: 'none' }}
                   onChange={handleFileUpload} />
-                <button className="btn btn-sm" onClick={() => setInputText('')}>清空</button>
+                <button className="btn btn-sm" onClick={() => setInputText('')}>{t('ai.clearText')}</button>
               </div>
             </div>
 
@@ -667,22 +669,22 @@ export default function AIAssistantPage() {
                     setAnalyzeChapterNum(chapters.length > 0 ? Math.max(...chapters.map((c) => c.number)) + 1 : 1);
                   }
                 }} />
-                关联到章节
+                {t('ai.linkToChapter')}
               </label>
               {linkToChapter && (
                 <>
-                  <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>第</span>
+                  <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{t('ai.chapterNum')}</span>
                   <input className="input" type="number" value={analyzeChapterNum}
                     onChange={(e) => setAnalyzeChapterNum(Math.max(1, parseInt(e.target.value) || 1))}
                     style={{ width: '70px', padding: '4px 8px', fontSize: '13px' }}
                     min={1} max={chapters.length > 0 ? Math.max(...chapters.map((c) => c.number)) + 1 : 999} />
-                  <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>章</span>
+                  <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{t('chap.number')}</span>
                   <input className="input" value={analyzeChapterTitle}
                     onChange={(e) => setAnalyzeChapterTitle(e.target.value)}
-                    placeholder="章节标题（可选）"
+                    placeholder={t('ai.chapterTitleOptional')}
                     style={{ flex: 1, padding: '4px 8px', fontSize: '13px', maxWidth: '200px' }} />
                   <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                    {chapters.find((c) => c.number === analyzeChapterNum) ? '（将更新已有章节）' : '（将创建新章节）'}
+                    {chapters.find((c) => c.number === analyzeChapterNum) ? t('ai.willUpdateChapter') : t('ai.willCreateChapter')}
                   </span>
                 </>
               )}
@@ -692,7 +694,7 @@ export default function AIAssistantPage() {
               className={styles.textArea}
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
-              placeholder="在此粘贴小说文本（支持 .txt / .md 文件上传）&#10;AI 将自动识别角色、世界观设定、伏笔等信息..."
+              placeholder={t('ai.pastePlaceholder')}
               rows={12}
             />
             <button
@@ -701,36 +703,45 @@ export default function AIAssistantPage() {
               disabled={loading || !inputText.trim()}
               style={{ marginTop: '10px' }}
             >
-              {loading ? '⏳ 分析中...' : '🔍 开始分析'}
+              {loading ? t('ai.analyzing') : t('ai.startAnalyze')}
             </button>
           </div>
 
           {analysisResult && (
             <div className={styles.resultSection}>
               <div className={styles.resultHeader}>
-                <h2>分析结果</h2>
+                <h2>{t('ai.analysisResult')}</h2>
                 {!applyStats && (
                   <button className="btn btn-primary" onClick={handleApply} disabled={loading}>
-                    ✅ 应用选中的项
+                    {t('ai.applySelected')}
                   </button>
                 )}
               </div>
 
               {applyStats && (
                 <div className={styles.applySuccess}>
-                  🎉 应用完成！
-                  角色：新增 {applyStats.charactersAdded} / 更新 {applyStats.charactersUpdated} / 关系 +{applyStats.characterRelationsAdded}；
-                  设定：新增 {applyStats.worldSettingsAdded} / 更新 {applyStats.worldSettingsUpdated} / 关系 +{applyStats.worldSettingRelationsAdded}；
-                  伏笔：+{applyStats.foreshadowsAdded}
+                  {t('ai.applyComplete')}{' '}
+                  {t('ai.analysisStats')
+                    .replace('{ca}', String(applyStats.charactersAdded))
+                    .replace('{cu}', String(applyStats.charactersUpdated))
+                    .replace('{cr}', String(applyStats.characterRelationsAdded))
+                    .replace('{wa}', String(applyStats.worldSettingsAdded))
+                    .replace('{wu}', String(applyStats.worldSettingsUpdated))
+                    .replace('{wr}', String(applyStats.worldSettingRelationsAdded))
+                    .replace('{fa}', String(applyStats.foreshadowsAdded))}
                   {(applyStats.chaptersAdded || applyStats.chaptersUpdated) ? (
-                    <span>；章节：{applyStats.chaptersAdded ? `新增 ${applyStats.chaptersAdded}` : ''}{applyStats.chaptersAdded && applyStats.chaptersUpdated ? ' / ' : ''}{applyStats.chaptersUpdated ? `更新 ${applyStats.chaptersUpdated}` : ''}</span>
+                    <span>；{t('ai.chapterStats').replace('{stats}',
+                      (applyStats.chaptersAdded ? `+${applyStats.chaptersAdded}` : '') +
+                      (applyStats.chaptersAdded && applyStats.chaptersUpdated ? ' / ' : '') +
+                      (applyStats.chaptersUpdated ? `+${applyStats.chaptersUpdated}` : '')
+                    )}</span>
                   ) : null}
                 </div>
               )}
 
               {analysisResult.summary && (
                 <div className={styles.summaryCard}>
-                  <div className={styles.summaryTitle}>📝 文本摘要</div>
+                  <div className={styles.summaryTitle}>{t('ai.textSummary')}</div>
                   <p>{analysisResult.summary}</p>
                 </div>
               )}
@@ -739,10 +750,10 @@ export default function AIAssistantPage() {
               <div className={styles.sectionCard}>
                 <div className={styles.sectionTitle} onClick={() => toggleSection('characters')}>
                   <span>{expandedSection.has('characters') ? '▾' : '▸'}</span>
-                  👤 提取角色 ({analysisResult.characters.length})
+                  {' '}{t('ai.extractChars')} ({analysisResult.characters.length})
                   <span style={{ marginLeft: 'auto', marginRight: '8px', fontSize: '11px', cursor: 'pointer' }}
                     onClick={(e) => { e.stopPropagation(); toggleAllChars(); }}>
-                    {selectAllChars ? '取消全选' : '全选'}
+                    {selectAllChars ? t('common.deselectAll') : t('common.selectAll')}
                   </span>
                 </div>
                 {expandedSection.has('characters') && (
@@ -756,17 +767,17 @@ export default function AIAssistantPage() {
                           <div className={styles.itemName}>
                             {c.name}
                             <span className={`${styles.matchBadge} ${styles[`badge${c._matchStatus}`]}`}>
-                              {c._matchStatus === 'new' ? '新增' : c._matchStatus === 'update' ? '更新' : '重复'}
+                              {c._matchStatus === 'new' ? t('ai.matchNew') : c._matchStatus === 'update' ? t('ai.matchUpdate') : t('ai.matchDuplicate')}
                             </span>
                           </div>
                           {c._existingName && (
-                            <div className={styles.matchHint}>已有：{c._existingName}</div>
+                            <div className={styles.matchHint}>{t('ai.existingLabel')}{c._existingName}</div>
                           )}
                           {c._duplicateOf && (
                             <div className={styles.matchWarning}>⚠ {c._duplicateOf}</div>
                           )}
                           <div className={styles.itemMeta}>
-                            {c.race && <span>种族：{c.race}</span>}
+                            {c.race && <span>{t('char.race')}：{c.race}</span>}
                             {c.status && <span>{c.status}</span>}
                           </div>
                           {c.resources?.length ? (
@@ -784,7 +795,7 @@ export default function AIAssistantPage() {
                         </div>
                       </div>
                     ))}
-                    {analysisResult.characters.length === 0 && <span className={styles.muted}>未提取到新角色</span>}
+                    {analysisResult.characters.length === 0 && <span className={styles.muted}>{t('ai.noNewChars')}</span>}
                   </div>
                 )}
               </div>
@@ -793,10 +804,10 @@ export default function AIAssistantPage() {
               <div className={styles.sectionCard}>
                 <div className={styles.sectionTitle} onClick={() => toggleSection('worldSettings')}>
                   <span>{expandedSection.has('worldSettings') ? '▾' : '▸'}</span>
-                  🌍 提取设定 ({analysisResult.worldSettings.length})
+                  {' '}{t('ai.extractSettings')} ({analysisResult.worldSettings.length})
                   <span style={{ marginLeft: 'auto', marginRight: '8px', fontSize: '11px', cursor: 'pointer' }}
                     onClick={(e) => { e.stopPropagation(); toggleAllSettings(); }}>
-                    {selectAllSettings ? '取消全选' : '全选'}
+                    {selectAllSettings ? t('common.deselectAll') : t('common.selectAll')}
                   </span>
                 </div>
                 {expandedSection.has('worldSettings') && (
@@ -810,17 +821,17 @@ export default function AIAssistantPage() {
                           <div className={styles.itemName}>
                             <span className={styles.tag}>{w.type}</span> {w.name}
                             <span className={`${styles.matchBadge} ${styles[`badge${w._matchStatus}`]}`}>
-                              {w._matchStatus === 'new' ? '新增' : w._matchStatus === 'update' ? '更新' : '重复'}
+                              {w._matchStatus === 'new' ? t('ai.matchNew') : w._matchStatus === 'update' ? t('ai.matchUpdate') : t('ai.matchDuplicate')}
                             </span>
                           </div>
-                          {w._existingName && <div className={styles.matchHint}>已有：{w._existingName}</div>}
+                          {w._existingName && <div className={styles.matchHint}>{t('ai.existingLabel')}{w._existingName}</div>}
                           {w._duplicateOf && <div className={styles.matchWarning}>⚠ {w._duplicateOf}</div>}
                           <div className={styles.itemDesc}>{w.description.slice(0, 120)}</div>
-                          {w.parentName && <div className={styles.itemMeta}>属于：{w.parentName}</div>}
+                          {w.parentName && <div className={styles.itemMeta}>{t('ai.belongsTo')}{w.parentName}</div>}
                         </div>
                       </div>
                     ))}
-                    {analysisResult.worldSettings.length === 0 && <span className={styles.muted}>未提取到新设定</span>}
+                    {analysisResult.worldSettings.length === 0 && <span className={styles.muted}>{t('ai.noNewSettings')}</span>}
                   </div>
                 )}
               </div>
@@ -829,10 +840,10 @@ export default function AIAssistantPage() {
               <div className={styles.sectionCard}>
                 <div className={styles.sectionTitle} onClick={() => toggleSection('foreshadows')}>
                   <span>{expandedSection.has('foreshadows') ? '▾' : '▸'}</span>
-                  🔮 发现伏笔 ({analysisResult.foreshadows.length})
+                  {' '}{t('ai.foundForeshadows')} ({analysisResult.foreshadows.length})
                   <span style={{ marginLeft: 'auto', marginRight: '8px', fontSize: '11px', cursor: 'pointer' }}
                     onClick={(e) => { e.stopPropagation(); toggleAllForeshadows(); }}>
-                    {selectAllForeshadows ? '取消全选' : '全选'}
+                    {selectAllForeshadows ? t('common.deselectAll') : t('common.selectAll')}
                   </span>
                 </div>
                 {expandedSection.has('foreshadows') && (
@@ -846,18 +857,18 @@ export default function AIAssistantPage() {
                           <div className={styles.itemName} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <span>{f.confidence === 'high' ? '🔴' : f.confidence === 'medium' ? '🟡' : '🟢'}</span>
                             <span className={`${styles.matchBadge} ${styles[`badge${f._matchStatus}`]}`}>
-                              {f._matchStatus === 'new' ? '新增' : f._matchStatus === 'update' ? '已存在' : '重复'}
+                              {f._matchStatus === 'new' ? t('ai.matchNew') : f._matchStatus === 'update' ? t('ai.matchExists') : t('ai.matchDuplicate')}
                             </span>
                           </div>
                           <div className={styles.itemDesc}>{f.content}</div>
-                          {f._existingContent && <div className={styles.matchHint}>已有：{f._existingContent.slice(0, 60)}...</div>}
+                          {f._existingContent && <div className={styles.matchHint}>{t('ai.existingLabel')}{f._existingContent.slice(0, 60)}...</div>}
                           {f.relatedCharacters.length > 0 && (
-                            <div className={styles.itemMeta}>关联：{f.relatedCharacters.join('、')}</div>
+                            <div className={styles.itemMeta}>{t('ai.related')}{f.relatedCharacters.join('、')}</div>
                           )}
                         </div>
                       </div>
                     ))}
-                    {analysisResult.foreshadows.length === 0 && <span className={styles.muted}>未发现明显伏笔</span>}
+                    {analysisResult.foreshadows.length === 0 && <span className={styles.muted}>{t('ai.noForeshadows')}</span>}
                   </div>
                 )}
               </div>
@@ -865,7 +876,7 @@ export default function AIAssistantPage() {
               {/* 建议 */}
               {analysisResult.suggestions.length > 0 && (
                 <div className={styles.suggestionsCard}>
-                  <div className={styles.summaryTitle}>💡 创作建议</div>
+                  <div className={styles.summaryTitle}>{t('ai.writingSuggestion')}</div>
                   <ul className={styles.suggestionsList}>
                     {analysisResult.suggestions.map((s, i) => (
                       <li key={i}>{s}</li>
@@ -883,43 +894,43 @@ export default function AIAssistantPage() {
         <div className={styles.tabContent}>
           <div className={styles.formCard}>
             <div className="form-group">
-              <label>选择章节（可选）</label>
+              <label>{t('ai.selectChapter')}（{t('common.optional')}）</label>
               <select className="select" value={selectedChapterId}
                 onChange={(e) => setSelectedChapterId(e.target.value)}>
-                <option value="">不选择（全局建议）</option>
+                <option value="">{t('ai.selectChapter')}（{t('common.optional')}）</option>
                 {chapters.map((ch) => (
-                  <option key={ch.id} value={ch.id}>第{ch.number}章 {ch.title}</option>
+                  <option key={ch.id} value={ch.id}>{t('ai.chapterNum')}{ch.number} {t('chap.number')} {ch.title}</option>
                 ))}
               </select>
             </div>
             <div className="form-group">
-              <label>角色弧光分析</label>
+              <label>{t('ai.arcAnalysis')}</label>
               <div style={{ display: 'flex', gap: '6px' }}>
                 <select className="select" value={arcCharId}
                   onChange={(e) => setArcCharId(e.target.value)}>
-                  <option value="">选择角色</option>
+                  <option value="">{t('ai.selectCharacter')}</option>
                   {characters.map((c) => (
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
                 </select>
                 <button className="btn btn-sm" onClick={handleArcAnalyze} disabled={loading || !arcCharId}>
-                  分析弧光
+                  {t('ai.analyzeArc')}
                 </button>
               </div>
             </div>
             {arcResult && (
               <div className={styles.markdownCard}>
-                <div className={styles.summaryTitle}>角色弧光分析</div>
+                <div className={styles.summaryTitle}>{t('ai.arcResult')}</div>
                 <div className={styles.mdContent}>{arcResult}</div>
               </div>
             )}
             <button className="btn btn-primary" onClick={handleSuggest} disabled={loading}
               style={{ marginTop: '10px' }}>
-              {loading ? '⏳ 思考中...' : '💡 获取创作建议'}
+              {loading ? t('ai.thinking') : t('ai.getSuggestions')}
             </button>
             {suggestion && (
               <div className={styles.markdownCard} style={{ marginTop: '16px' }}>
-                <div className={styles.summaryTitle}>创作建议</div>
+                <div className={styles.summaryTitle}>{t('ai.suggestionResult')}</div>
                 <div className={styles.mdContent}>{suggestion}</div>
               </div>
             )}
@@ -932,36 +943,36 @@ export default function AIAssistantPage() {
         <div className={styles.tabContent}>
           <div className={styles.formCard}>
             <p className={styles.hint}>
-              选择一个章节，AI 将分析章节内容并自动检测角色资源/能力的状态变化（如：获得新能力、消耗物品等）
+              {t('ai.resourceScan')}
             </p>
             <div className="form-group">
-              <label>选择章节</label>
+              <label>{t('ai.resourceScanHint')}</label>
               <select className="select" value={selectedChapterId}
                 onChange={(e) => setSelectedChapterId(e.target.value)}>
-                <option value="">选择章节</option>
+                <option value="">{t('ai.selectChapter')}</option>
                 {chapters.map((ch) => (
-                  <option key={ch.id} value={ch.id}>第{ch.number}章 {ch.title}</option>
+                  <option key={ch.id} value={ch.id}>{t('ai.chapterNum')}{ch.number} {t('chap.number')} {ch.title}</option>
                 ))}
               </select>
             </div>
             <div className="form-group">
-              <label>或直接粘贴文本</label>
+              <label>{t('ai.pasteText')}</label>
               <textarea className={styles.textArea} value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
-                placeholder="粘贴章节内容或摘要..."
+                placeholder={t('ai.pastePlaceholder')}
                 rows={6}
               />
             </div>
             <button className="btn btn-primary" onClick={handleResourceScan} disabled={loading}>
-              {loading ? '⏳ 分析中...' : '🔍 扫描资源变化'}
+              {loading ? t('ai.scanning') : t('ai.scanChanges')}
             </button>
 
             {resourceUpdates.length > 0 && (
               <div className={styles.resultSection} style={{ marginTop: '16px' }}>
                 <div className={styles.resultHeader}>
-                  <h3>检测到 {resourceUpdates.length} 项资源状态变化</h3>
+                  <h3>{t('ai.detectedChanges').replace('{n}', String(resourceUpdates.length))}</h3>
                   <button className="btn btn-primary btn-sm" onClick={handleApplyResourceUpdates} disabled={loading}>
-                    应用更新
+                    {t('ai.applyUpdate')}
                   </button>
                 </div>
                 <div className={styles.itemList}>
@@ -977,7 +988,7 @@ export default function AIAssistantPage() {
               </div>
             )}
             {resourceUpdates.length === 0 && !loading && (
-              <div className={styles.emptyHint}>点击扫描检测资源变化</div>
+              <div className={styles.emptyHint}>{t('ai.clickToScan')}</div>
             )}
           </div>
         </div>
@@ -987,39 +998,39 @@ export default function AIAssistantPage() {
       {activeTab === 'continue' && (
         <div className={styles.tabContent}>
           <div className={styles.formCard}>
-            <h3>✍️ AI 章节续写</h3>
-            <p className={styles.hint}>选择上一章，AI 将根据已有内容、角色设定和进行中的伏笔续写下一章。</p>
+            <h3>{t('ai.continueTitle')}</h3>
+            <p className={styles.hint}>{t('ai.continueHint')}</p>
             <div className="form-group">
-              <label>上一章</label>
+              <label>{t('ai.prevChapter')}</label>
               <select className="select" value={continueChapterId} onChange={(e) => setContinueChapterId(e.target.value)}>
-                <option value="">选择章节</option>
+                <option value="">{t('ai.selectChapter')}</option>
                 {[...chapters].sort((a, b) => a.number - b.number).map((ch) => (
-                  <option key={ch.id} value={ch.id}>第{ch.number}章 {ch.title}</option>
+                  <option key={ch.id} value={ch.id}>{t('ai.chapterNum')}{ch.number} {t('chap.number')} {ch.title}</option>
                 ))}
               </select>
             </div>
             <div className="form-group">
-              <label>下一章大纲（可选）</label>
+              <label>{t('ai.nextOutline')}</label>
               <textarea className="textarea" value={continueOutline} onChange={(e) => setContinueOutline(e.target.value)}
-                placeholder="简要描述下一章要发生的内容..." rows={3} />
+                placeholder={t('ai.outlinePlaceholder')} rows={3} />
             </div>
             <div className="form-group">
-              <label>写作风格要求（可选）</label>
+              <label>{t('ai.styleGuide')}</label>
               <input className="input" value={continueStyle} onChange={(e) => setContinueStyle(e.target.value)}
-                placeholder="如：热血战斗、悬疑推理、轻松日常..." />
+                placeholder={t('ai.stylePlaceholder')} />
             </div>
             <button className="btn btn-primary" onClick={handleContinue} disabled={loading || !continueChapterId}>
-              {loading ? '⏳ 续写中...' : '✍️ 开始续写'}
+              {loading ? t('ai.continuing') : t('ai.startContinue')}
             </button>
 
             {continueResult && (
               <div className={styles.markdownCard} style={{ marginTop: '16px' }}>
-                <div className={styles.summaryTitle}>续写结果 — {continueResult.title}（{continueResult.wordCount}字）</div>
-                <p className={styles.hint}>💡 写作思路：{continueResult.reasoning}</p>
+                <div className={styles.summaryTitle}>{t('ai.continueResult')} — {continueResult.title}（{continueResult.wordCount}{t('chap.wordCount')}）</div>
+                <p className={styles.hint}>{t('ai.reasoning')}{continueResult.reasoning}</p>
                 <div className={styles.mdContent}>{continueResult.content.slice(0, 2000)}{continueResult.content.length > 2000 ? '...' : ''}</div>
                 <div style={{ marginTop: '12px', display: 'flex', gap: '8px' }}>
-                  <button className="btn btn-primary btn-sm" onClick={saveContinuedChapter}>📖 保存为章节</button>
-                  <button className="btn btn-sm" onClick={() => setContinueResult(null)}>清除</button>
+                  <button className="btn btn-primary btn-sm" onClick={saveContinuedChapter}>{t('ai.saveAsChapter')}</button>
+                  <button className="btn btn-sm" onClick={() => setContinueResult(null)}>{t('common.clear')}</button>
                 </div>
               </div>
             )}
@@ -1031,22 +1042,22 @@ export default function AIAssistantPage() {
       {activeTab === 'consistency' && (
         <div className={styles.tabContent}>
           <div className={styles.formCard}>
-            <h3>🔍 AI 一致性检查</h3>
-            <p className={styles.hint}>扫描全部章节、角色、伏笔和世界观设定，检测设定矛盾、时间线冲突等问题。</p>
+            <h3>{t('ai.consistencyTitle')}</h3>
+            <p className={styles.hint}>{t('ai.consistencyHint')}</p>
             <button className="btn btn-primary" onClick={handleConsistencyCheck} disabled={loading}>
-              {loading ? '⏳ 检查中...' : '🔍 开始检查'}
+              {loading ? t('ai.checking') : t('ai.startCheck')}
             </button>
 
             {consistencyReport && (
               <div className={styles.resultSection} style={{ marginTop: '16px' }}>
                 <div className={styles.resultHeader}>
-                  <h3>一致性评分：{consistencyReport.score}/100</h3>
+                  <h3>{t('ai.consistencyScore')}：{consistencyReport.score}/100</h3>
                 </div>
                 <p className={styles.summaryCard} style={{ padding: '10px' }}>
-                  <strong>总结：</strong>{consistencyReport.summary}
+                  <strong>{t('ai.summary')}</strong>{consistencyReport.summary}
                 </p>
                 {consistencyReport.issues.length === 0 ? (
-                  <p className={styles.hint} style={{ textAlign: 'center', padding: '20px' }}>🎉 未发现明显一致性问题！</p>
+                  <p className={styles.hint} style={{ textAlign: 'center', padding: '20px' }}>{t('ai.noIssues')}</p>
                 ) : (
                   <div className={styles.itemList}>
                     {consistencyReport.issues.map((issue, i) => (
@@ -1076,19 +1087,19 @@ export default function AIAssistantPage() {
       {activeTab === 'complete' && (
         <div className={styles.tabContent}>
           <div className={styles.formCard}>
-            <h3>🌐 AI 世界观补全</h3>
-            <p className={styles.hint}>AI 分析已有世界观设定，检测逻辑空白、建议关联关系和补充细节。</p>
+            <h3>{t('ai.completeTitle')}</h3>
+            <p className={styles.hint}>{t('ai.completeHint')}</p>
             <button className="btn btn-primary" onClick={handleWorldComplete} disabled={loading}>
-              {loading ? '⏳ 分析中...' : '🌐 开始分析'}
+              {loading ? t('ai.analyzing') : t('ai.startComplete')}
             </button>
 
             {worldCompletion && (
               <div className={styles.resultSection} style={{ marginTop: '16px' }}>
                 <p className={styles.summaryCard} style={{ padding: '10px' }}>
-                  <strong>总结：</strong>{worldCompletion.summary}
+                  <strong>{t('ai.summary')}</strong>{worldCompletion.summary}
                 </p>
                 {worldCompletion.suggestions.length === 0 ? (
-                  <p className={styles.hint} style={{ textAlign: 'center', padding: '20px' }}>✅ 现有设定已比较完善</p>
+                  <p className={styles.hint} style={{ textAlign: 'center', padding: '20px' }}>{t('ai.noGaps')}</p>
                 ) : (
                   <div className={styles.itemList}>
                     {worldCompletion.suggestions.map((sug, i) => (
@@ -1099,11 +1110,11 @@ export default function AIAssistantPage() {
                           <div className={styles.itemName}>
                             {sug.type === 'gap' ? '🕳' : sug.type === 'relation' ? '🔗' : '📝'} {sug.title}
                             <span className={styles.tag} style={{ marginLeft: '6px' }}>
-                              {sug.type === 'gap' ? '逻辑空白' : sug.type === 'relation' ? '关联建议' : '细节补充'}
+                              {sug.type === 'gap' ? t('ai.logicGap') : sug.type === 'relation' ? t('ai.relationSuggest') : t('ai.detailSuggest')}
                             </span>
                           </div>
                           <div className={styles.itemDesc}>{sug.description}</div>
-                          <div className={styles.itemMeta}>关联设定：{sug.relatedSettings.join('、')}</div>
+                          <div className={styles.itemMeta}>{t('ai.related')}{sug.relatedSettings.join('、')}</div>
                           <div className={styles.matchHint}>💡 {sug.suggestion}</div>
                         </div>
                       </div>
@@ -1123,31 +1134,31 @@ export default function AIAssistantPage() {
       {activeTab === 'snapshots' && (
         <div className={styles.tabContent}>
           <div className={styles.formCard}>
-            <h3>📜 版本历史</h3>
-            <p className={styles.hint}>创建数据快照，随时恢复到任意版本。快照存储在浏览器本地，最多保留 50 个。</p>
+            <h3>{t('ai.snapshotsTitle')}</h3>
+            <p className={styles.hint}>{t('ai.snapshotsHint')}</p>
             <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
-              <button className="btn btn-primary btn-sm" onClick={handleCreateSnapshot}>📸 创建快照</button>
-              <button className="btn btn-sm" onClick={loadSnapshots}>🔄 刷新列表</button>
+              <button className="btn btn-primary btn-sm" onClick={handleCreateSnapshot}>{t('ai.createSnapshot')}</button>
+              <button className="btn btn-sm" onClick={loadSnapshots}>{t('ai.refreshList')}</button>
             </div>
 
             {/* 快照对比 */}
             <div className="form-group">
-              <label>快照对比</label>
+              <label>{t('ai.snapshotCompare')}</label>
               <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                 <select className="select" value={diffA} onChange={(e) => setDiffA(e.target.value)} style={{ flex: 1 }}>
-                  <option value="">选择快照 A</option>
+                  <option value="">{t('ai.selectSnapshotA')}</option>
                   {snapshots.map((s) => (
-                    <option key={s.id} value={s.id}>{s.label}（{new Date(s.timestamp).toLocaleString('zh-CN')}）</option>
+                    <option key={s.id} value={s.id}>{s.label}（{new Date(s.timestamp).toLocaleString(lang === 'zh' ? 'zh-CN' : 'en-US')}）</option>
                   ))}
                 </select>
                 <span>vs</span>
                 <select className="select" value={diffB} onChange={(e) => setDiffB(e.target.value)} style={{ flex: 1 }}>
-                  <option value="">选择快照 B</option>
+                  <option value="">{t('ai.selectSnapshotB')}</option>
                   {snapshots.map((s) => (
-                    <option key={s.id} value={s.id}>{s.label}（{new Date(s.timestamp).toLocaleString('zh-CN')}）</option>
+                    <option key={s.id} value={s.id}>{s.label}（{new Date(s.timestamp).toLocaleString(lang === 'zh' ? 'zh-CN' : 'en-US')}）</option>
                   ))}
                 </select>
-                <button className="btn btn-sm" onClick={handleDiffSnapshots} disabled={!diffA || !diffB}>对比</button>
+                <button className="btn btn-sm" onClick={handleDiffSnapshots} disabled={!diffA || !diffB}>{t('ai.compare')}</button>
               </div>
               {diffResult && (
                 <div className={styles.markdownCard} style={{ marginTop: '8px' }}>
@@ -1158,7 +1169,7 @@ export default function AIAssistantPage() {
 
             {/* 快照列表 */}
             {snapshots.length === 0 ? (
-              <p className={styles.emptyHint}>暂无快照，点击「创建快照」保存当前数据状态</p>
+              <p className={styles.emptyHint}>{t('ai.noSnapshots')}</p>
             ) : (
               <div className={styles.itemList}>
                 {snapshots.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).map((s) => (
@@ -1166,16 +1177,16 @@ export default function AIAssistantPage() {
                     <div>
                       <div style={{ fontWeight: 600 }}>{s.label}</div>
                       <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                        角色 {s.data.characters.length} · 章节 {s.data.chapters.length} · 伏笔 {s.data.foreshadows.length} · 设定 {s.data.worldSettings.length}
+                        {t('nav.characters')} {s.data.characters.length} · {t('nav.chapters')} {s.data.chapters.length} · {t('nav.foreshadows')} {s.data.foreshadows.length} · {t('nav.worldsettings')} {s.data.worldSettings.length}
                       </div>
                       <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
-                        {new Date(s.timestamp).toLocaleString('zh-CN')}
+                        {new Date(s.timestamp).toLocaleString(lang === 'zh' ? 'zh-CN' : 'en-US')}
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: '4px' }}>
-                      <button className="btn btn-sm" onClick={() => handleRestoreSnapshot(s)}>恢复</button>
+                      <button className="btn btn-sm" onClick={() => handleRestoreSnapshot(s)}>{t('common.restore')}</button>
                       <button className="btn btn-sm btn-ghost" style={{ color: 'var(--danger)' }}
-                        onClick={() => handleDeleteSnapshot(s.id)}>删除</button>
+                        onClick={() => handleDeleteSnapshot(s.id)}>{t('common.delete')}</button>
                     </div>
                   </div>
                 ))}
@@ -1189,33 +1200,33 @@ export default function AIAssistantPage() {
       {activeTab === 'settings' && (
         <div className={styles.tabContent}>
           <div className={styles.formCard}>
-            <h3>API 配置</h3>
+            <h3>{t('ai.settingsTitle')}</h3>
             <p className={styles.hint}>
-              支持 OpenAI 兼容 API（可填写其他服务商如 DeepSeek、通义千问等的兼容端点）
+              {t('ai.settingsHint')}
             </p>
             <div className="form-group">
-              <label>API 地址</label>
+              <label>{t('ai.apiUrl')}</label>
               <input className="input" value={apiUrl}
                 onChange={(e) => setApiUrl(e.target.value)}
                 placeholder="https://api.openai.com/v1/chat/completions" />
             </div>
             <div className="form-group">
-              <label>API Key</label>
+              <label>{t('ai.apiKey')}</label>
               <input className="input" type="password" value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
                 placeholder="sk-..." />
             </div>
             <div className="form-group">
-              <label>模型</label>
+              <label>{t('ai.model')}</label>
               <input className="input" value={model}
                 onChange={(e) => setModel(e.target.value)}
                 placeholder="gpt-3.5-turbo / gpt-4 / deepseek-chat" />
             </div>
             <button className="btn btn-primary" onClick={handleSaveConfig}>
-              {configSaved ? '✅ 已保存' : '保存配置'}
+              {configSaved ? t('ai.saved') : t('ai.saveConfig')}
             </button>
             <div className={styles.configHint}>
-              API Key 仅保存在浏览器本地存储中，不会上传到任何服务器。
+              {t('ai.configSecurity')}
             </div>
           </div>
         </div>
@@ -1226,24 +1237,25 @@ export default function AIAssistantPage() {
 
 // ========== AI 操作历史 Tab 组件 ==========
 
-const TYPE_LABELS: Record<string, string> = {
-  analyze: '📖 文本分析',
-  suggest: '💡 创作建议',
-  resources: '🔄 资源扫描',
-  continue: '✍️ 章节续写',
-  consistency: '🔍 一致性检查',
-  complete: '🌐 世界观补全',
-};
-
 function AIHistoryTab({ projectId }: { projectId: string }) {
+  const { t, lang } = useT();
   const [history, setHistory] = useState<AIHistoryEntry[]>([]);
+
+  const TYPE_LABELS: Record<string, string> = {
+    analyze: t('ai.tab.analyze'),
+    suggest: t('ai.tab.suggest'),
+    resources: t('ai.tab.resources'),
+    continue: t('ai.tab.continue'),
+    consistency: t('ai.tab.consistency'),
+    complete: t('ai.tab.complete'),
+  };
 
   useEffect(() => {
     setHistory(getAIHistory(projectId));
   }, [projectId]);
 
   const handleClear = () => {
-    if (!confirm('确定清空所有 AI 操作历史？')) return;
+    if (!confirm(t('ai.confirmClearHistory'))) return;
     clearAIHistory(projectId);
     setHistory([]);
   };
@@ -1257,10 +1269,10 @@ function AIHistoryTab({ projectId }: { projectId: string }) {
     return (
       <div className={styles.tabContent}>
         <div className={styles.formCard}>
-          <h3>📋 AI 操作历史</h3>
-          <p className={styles.hint}>AI 助手的所有操作记录将显示在这里，方便回顾和追溯。</p>
+          <h3>{t('ai.historyTitle')}</h3>
+          <p className={styles.hint}>{t('ai.historyHint')}</p>
           <div className={styles.emptyHint} style={{ textAlign: 'center', padding: '30px' }}>
-            📭 暂无操作记录
+            {t('ai.noHistory')}
           </div>
         </div>
       </div>
@@ -1271,9 +1283,9 @@ function AIHistoryTab({ projectId }: { projectId: string }) {
     <div className={styles.tabContent}>
       <div className={styles.formCard}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-          <h3>📋 AI 操作历史（{history.length} 条）</h3>
+          <h3>{t('ai.historyCount').replace('{n}', String(history.length))}</h3>
           <button className="btn btn-sm" style={{ color: 'var(--danger)' }} onClick={handleClear}>
-            🗑 清空
+            {t('ai.clearHistory')}
           </button>
         </div>
         <div className={styles.itemList}>
@@ -1285,7 +1297,7 @@ function AIHistoryTab({ projectId }: { projectId: string }) {
                     {TYPE_LABELS[entry.type] || entry.label}
                   </span>
                   <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
-                    {new Date(entry.timestamp).toLocaleString('zh-CN')}
+                    {new Date(entry.timestamp).toLocaleString(lang === 'zh' ? 'zh-CN' : 'en-US')}
                   </span>
                 </div>
                 <div style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
@@ -1297,7 +1309,7 @@ function AIHistoryTab({ projectId }: { projectId: string }) {
                 style={{ color: 'var(--danger)', fontSize: '11px', flexShrink: 0, marginLeft: '8px' }}
                 onClick={() => handleDelete(entry.id)}
               >
-                删除
+                {t('common.delete')}
               </button>
             </div>
           ))}

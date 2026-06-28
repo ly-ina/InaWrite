@@ -2,15 +2,13 @@ appId: com.inakb.novel
 productName: Novel InaKB
 directories:
   output: release
-asar: true
+asar: false
 files:
   - dist/**/*
   - dist-electron/**/*
   - public/**/*
+  - package.json
 win:
-  target:
-    - target: portable
-      arch: [x64]
   icon: public/favicon.svg
 mac:
   target: [dmg, zip]

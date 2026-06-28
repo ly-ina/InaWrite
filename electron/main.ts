@@ -68,6 +68,11 @@ function createWindow() {
 
   // 点 X 彻底关闭（不再隐藏到托盘）
   mainWindow.on('close', () => {
+    // 销毁托盘，防止后台残留
+    if (tray) {
+      tray.destroy();
+      tray = null;
+    }
     mainWindow = null;
   });
 }
@@ -353,4 +358,9 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   isQuitting = true;
   stopAutosave();
+  // 销毁托盘，防止进程残留
+  if (tray) {
+    tray.destroy();
+    tray = null;
+  }
 });

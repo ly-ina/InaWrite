@@ -4,6 +4,8 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
+import { useT } from '../i18n';
+import { useT } from '../i18n';
 import { useCharacterStore } from '../store/characterStore';
 import { useChapterStore } from '../store/chapterStore';
 import { useAppStore } from '../store/appStore';
@@ -21,6 +23,14 @@ export default function CharactersPage() {
   const { currentProject, refreshKey } = useAppStore();
   const { characters, loading, loadCharacters, createCharacter, updateCharacter, deleteCharacter } = useCharacterStore();
   const { chapters, loadChapters } = useChapterStore();
+
+  // 移动端检测
+  const [isMobileView, setIsMobileView] = useState(() => window.innerWidth <= 768);
+  useEffect(() => {
+    const check = () => setIsMobileView(window.innerWidth <= 768);
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
   // 列表 / 详情视图
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -455,6 +465,7 @@ export default function CharactersPage() {
           </div>
 
           {/* 右侧角色详情 */}
+          {!isMobileView && (
           <div className={styles.detailPanel}>
             {!selectedChar ? (
               <div className="empty-state">
@@ -770,6 +781,289 @@ export default function CharactersPage() {
                   )}
                   {editingResource && !editingResourceId && (
                     /* 新增资源的内联表单 */
+                    <div className={styles.inlineForm} style={{ flexDirection: 'column' }}>
+                      <input className="input" placeholder="名称" value={resName} onChange={(e) => setResName(e.target.value)} autoFocus />
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <select className="select" value={resType} onChange={(e) => setResType(e.target.value as Resource['type'])}>
+                          <option value="能力">能力</option>
+                          <option value="物品">物品</option>
+                          <option value="代价">代价</option>
+                          <option value="其他">其他</option>
+                        </select>
+                        <select className="select" value={resStatus} onChange={(e) => setResStatus(e.target.value as ResourceStatus)}>
+                          <option value="未获得">未获得</option>
+                          <option value="已获得">已获得</option>
+                          <option value="已消耗">已消耗</option>
+                          <option value="进行中">进行中</option>
+                        </select>
+                      </div>
+                      <textarea className="textarea" placeholder="描述" value={resDesc} onChange={(e) => setResDesc(e.target.value)} rows={2} />
+                      <input className="input" placeholder="获取时间/章节（可选）" value={resObtainedAt} onChange={(e) => setResObtainedAt(e.target.value)} />
+                      <input className="input" placeholder="代价（可选）" value={resCost} onChange={(e) => setResCost(e.target.value)} />
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <button className="btn btn-primary btn-sm" onClick={saveResource}>确定</button>
+                        <button className="btn btn-sm" onClick={resetResourceForm}>取消</button>
+                      </div>
+                    </div>
+                  )}
+                </section>
+              </div>
+            )}
+          </div>
+          )}
+        </div>
+      )}
+
+      {/* 移动端全屏角色详情覆盖层 */}
+      {isMobileView && selectedChar && (
+        <div className={`detail-full-overlay ${styles.mobileOverlay}`}>
+          <div className={`detail-full-panel ${styles.mobileDetailPanel}`}>
+            <div className={`detail-full-nav ${styles.mobileDetailNav}`}>
+              <button className={`detail-full-back ${styles.mobileBackBtn}`} onClick={() => setSelectedId(null)}>
+                ← 返回列表
+              </button>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button className="btn btn-sm" onClick={() => startEdit(selectedChar)}>编辑</button>
+                <button className="btn btn-danger btn-sm" onClick={() => handleDelete(selectedChar.id, selectedChar.name)}>删除</button>
+              </div>
+            </div>
+
+            {editingChar?.id === selectedChar.id ? (
+              <div className={`detail-full-body ${styles.mobileDetailBody}`}>
+                <h2>编辑角色</h2>
+                <div className="form-group">
+                  <label>姓名</label>
+                  <input className="input" value={editingChar.name}
+                    onChange={(e) => setEditingChar({ ...editingChar, name: e.target.value })} />
+                </div>
+                <div className="form-group">
+                  <label>种族</label>
+                  <input className="input" value={editingChar.race || ''}
+                    onChange={(e) => setEditingChar({ ...editingChar, race: e.target.value })} />
+                </div>
+                <div className="form-group">
+                  <label>年龄</label>
+                  <input className="input" value={editingChar.age || ''}
+                    onChange={(e) => setEditingChar({ ...editingChar, age: e.target.value })} />
+                </div>
+                <div className="form-group">
+                  <label>状态</label>
+                  <select className="select" value={editingChar.status}
+                    onChange={(e) => setEditingChar({ ...editingChar, status: e.target.value as Character['status'] })}>
+                    <option value="alive">存活</option>
+                    <option value="dead">死亡</option>
+                    <option value="unknown">未知</option>
+                    <option value="mentioned">提及</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>外貌</label>
+                  <textarea className="textarea" value={editingChar.appearance || ''}
+                    onChange={(e) => setEditingChar({ ...editingChar, appearance: e.target.value })} rows={2} />
+                </div>
+                <div className="form-group">
+                  <label>性格</label>
+                  <textarea className="textarea" value={editingChar.personality || ''}
+                    onChange={(e) => setEditingChar({ ...editingChar, personality: e.target.value })} rows={2} />
+                </div>
+                <div className="form-group">
+                  <label>描述</label>
+                  <MarkdownEditor value={editingChar.description}
+                    onChange={(v) => setEditingChar({ ...editingChar, description: v })} rows={5} />
+                </div>
+                <div className="form-actions" style={{ borderTop: 'none', paddingTop: 0 }}>
+                  <button className="btn" onClick={() => setEditingChar(null)}>取消</button>
+                  <button className="btn btn-primary" onClick={handleUpdate}>保存</button>
+                </div>
+              </div>
+            ) : (
+              <div className={`detail-full-body ${styles.mobileDetailBody}`}>
+                <div className={styles.detailHeader}>
+                  <div className={styles.detailAvatar}>{selectedChar.name.charAt(0)}</div>
+                  <div>
+                    <h2>{selectedChar.name}</h2>
+                    <div className={styles.detailMeta}>
+                      {selectedChar.race && <span>{selectedChar.race}</span>}
+                      {selectedChar.age && <span>{selectedChar.age}</span>}
+                      <span className={`tag tag-${selectedChar.status}`}>{STATUS_LABELS[selectedChar.status]}</span>
+                    </div>
+                  </div>
+                </div>
+                <section className={styles.section}>
+                  <h3>基本信息</h3>
+                  {selectedChar.currentLocation && (
+                    <div className={styles.infoRow}>
+                      <span className={styles.infoLabel}>所在地</span>
+                      <span className={styles.locationBadge}>📍 {selectedChar.currentLocation}</span>
+                    </div>
+                  )}
+                  {selectedChar.appearance && (
+                    <div className={styles.infoRow}>
+                      <span className={styles.infoLabel}>外貌</span>
+                      <span>{selectedChar.appearance}</span>
+                    </div>
+                  )}
+                  {selectedChar.personality && (
+                    <div className={styles.infoRow}>
+                      <span className={styles.infoLabel}>性格</span>
+                      <span>{selectedChar.personality}</span>
+                    </div>
+                  )}
+                  {selectedChar.voice && (
+                    <div className={styles.infoRow}>
+                      <span className={styles.infoLabel}>语言风格</span>
+                      <span className={styles.voiceText}>💬 {selectedChar.voice}</span>
+                    </div>
+                  )}
+                  <div className={styles.infoRow}>
+                    <span className={styles.infoLabel}>描述</span>
+                    <div className={styles.mdContent}>
+                      {selectedChar.description ? (
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{selectedChar.description}</ReactMarkdown>
+                      ) : (
+                        <span className={styles.muted}>暂无描述</span>
+                      )}
+                    </div>
+                  </div>
+                </section>
+                {selectedChar.arc && (
+                  <section className={styles.section}>
+                    <h3>📈 角色弧光</h3>
+                    <div className={styles.mdContent}>
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{selectedChar.arc}</ReactMarkdown>
+                    </div>
+                  </section>
+                )}
+                {selectedChar.secret && (
+                  <section className={styles.section} style={{ borderColor: 'var(--warning)', background: 'rgba(201,158,75,0.05)', padding: '12px', borderRadius: 'var(--radius-sm)' }}>
+                    <h3 style={{ color: 'var(--warning)' }}>🔒 秘密</h3>
+                    <div className={styles.mdContent}>
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{selectedChar.secret}</ReactMarkdown>
+                    </div>
+                  </section>
+                )}
+                <section className={styles.section}>
+                  <h3>出场章节</h3>
+                  {selectedChar.appearances.length === 0 ? (
+                    <span className={styles.muted}>暂无记录</span>
+                  ) : (
+                    <div className={styles.tagList}>
+                      {selectedChar.appearances.map((chId) => (
+                        <span key={chId} className={styles.chapterTag}>{getChapterTitle(chId)}</span>
+                      ))}
+                    </div>
+                  )}
+                </section>
+                <section className={styles.section}>
+                  <div className={styles.sectionHeader}>
+                    <h3>角色关系</h3>
+                    <button className="btn btn-sm" onClick={() => setEditingRelation(true)}>+ 添加</button>
+                  </div>
+                  {selectedChar.relations.length === 0 ? (
+                    <span className={styles.muted}>暂无关系</span>
+                  ) : (
+                    <div className={styles.relationList}>
+                      {selectedChar.relations.map((rel) => (
+                        <div key={rel.targetId} className={styles.relationItem}>
+                          <span className={styles.relType}>{rel.type}</span>
+                          <span className={styles.relDir}>{rel.direction === '单向' ? '→' : '↔'}</span>
+                          <span className={styles.relTarget} onClick={() => setSelectedId(rel.targetId)} style={{ cursor: 'pointer', color: 'var(--accent)' }}>
+                            {getCharName(rel.targetId)}
+                          </span>
+                          {!rel.isPublic && <span className={styles.relSecret} title="秘密关系">🔒</span>}
+                          {rel.description && <span className={styles.relDesc}>{rel.description}</span>}
+                          <button className="btn btn-sm btn-ghost" onClick={() => removeRelation(rel.targetId)} style={{ marginLeft: 'auto', color: 'var(--danger)', fontSize: '11px' }}>移除</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {editingRelation && (
+                    <div className={styles.inlineForm} style={{ flexDirection: 'column', gap: '6px' }}>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <select className="select" value={relTarget} onChange={(e) => setRelTarget(e.target.value)}>
+                          <option value="">选择角色</option>
+                          {characters.filter((c) => c.id !== selectedChar.id).map((c) => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                        </select>
+                        <select className="select" value={relType} onChange={(e) => setRelType(e.target.value)}>
+                          {RELATION_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                        <select className="select" value={relDirection} onChange={(e) => setRelDirection(e.target.value as Relation['direction'])}>
+                          <option value="双向">↔ 双向</option>
+                          <option value="单向">→ 单向</option>
+                        </select>
+                        <label style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+                          <input type="checkbox" checked={relPublic} onChange={(e) => setRelPublic(e.target.checked)} />公开
+                        </label>
+                      </div>
+                      <input className="input" placeholder="关系描述（可选）" value={relDesc} onChange={(e) => setRelDesc(e.target.value)} />
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <button className="btn btn-primary btn-sm" onClick={addRelation}>确定</button>
+                        <button className="btn btn-sm" onClick={() => setEditingRelation(false)}>取消</button>
+                      </div>
+                    </div>
+                  )}
+                </section>
+                <section className={styles.section}>
+                  <div className={styles.sectionHeader}>
+                    <h3>资源/能力</h3>
+                    <button className="btn btn-sm" onClick={() => { resetResourceForm(); setEditingResource(true); }}>+ 添加</button>
+                  </div>
+                  {selectedChar.resources.length === 0 && !editingResource ? (
+                    <span className={styles.muted}>暂无记录</span>
+                  ) : (
+                    <div className={styles.resourceList}>
+                      {selectedChar.resources.map((res) => (
+                        <div key={res.id} className={styles.resourceItem}>
+                          {editingResource && editingResourceId === res.id ? (
+                            <div className={styles.inlineForm} style={{ flexDirection: 'column', marginTop: 0 }}>
+                              <input className="input" placeholder="名称" value={resName} onChange={(e) => setResName(e.target.value)} autoFocus />
+                              <div style={{ display: 'flex', gap: '6px' }}>
+                                <select className="select" value={resType} onChange={(e) => setResType(e.target.value as Resource['type'])}>
+                                  <option value="能力">能力</option>
+                                  <option value="物品">物品</option>
+                                  <option value="代价">代价</option>
+                                  <option value="其他">其他</option>
+                                </select>
+                                <select className="select" value={resStatus} onChange={(e) => setResStatus(e.target.value as ResourceStatus)}>
+                                  <option value="未获得">未获得</option>
+                                  <option value="已获得">已获得</option>
+                                  <option value="已消耗">已消耗</option>
+                                  <option value="进行中">进行中</option>
+                                </select>
+                              </div>
+                              <textarea className="textarea" placeholder="描述" value={resDesc} onChange={(e) => setResDesc(e.target.value)} rows={2} />
+                              <input className="input" placeholder="获取时间/章节（可选）" value={resObtainedAt} onChange={(e) => setResObtainedAt(e.target.value)} />
+                              <input className="input" placeholder="代价（可选）" value={resCost} onChange={(e) => setResCost(e.target.value)} />
+                              <div style={{ display: 'flex', gap: '6px' }}>
+                                <button className="btn btn-primary btn-sm" onClick={saveResource}>保存</button>
+                                <button className="btn btn-sm" onClick={resetResourceForm}>取消</button>
+                              </div>
+                            </div>
+                          ) : (
+                            <>
+                              <div className={styles.resName}>
+                                {res.name}
+                                <span className={styles.resType}>{res.type}</span>
+                                <span className={`${styles.resStatus} ${styles[`resStatus${res.status}`] || ''}`}>{res.status}</span>
+                              </div>
+                              {res.description && <div className={styles.resDesc}>{res.description}</div>}
+                              {res.obtainedAt && <div className={styles.resObtained}>📅 {res.obtainedAt}</div>}
+                              {res.cost && <div className={styles.resCost}>💸 代价：{res.cost}</div>}
+                              <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
+                                <button className="btn btn-sm btn-ghost" onClick={() => openEditResource(res)} style={{ color: 'var(--accent)', fontSize: '11px' }}>编辑</button>
+                                <button className="btn btn-sm btn-ghost" onClick={() => removeResource(res.id)} style={{ color: 'var(--danger)', fontSize: '11px' }}>移除</button>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {editingResource && !editingResourceId && (
                     <div className={styles.inlineForm} style={{ flexDirection: 'column' }}>
                       <input className="input" placeholder="名称" value={resName} onChange={(e) => setResName(e.target.value)} autoFocus />
                       <div style={{ display: 'flex', gap: '6px' }}>

@@ -18,6 +18,7 @@ import TemplatesPage from './pages/Templates';
 import AIAssistantPage from './pages/AIAssistant';
 import OutlinePage from './pages/Outline';
 import TagsPage from './pages/Tags';
+import AboutPage from './pages/About';
 import { electronBridge } from './utils/electronBridge';
 import { useAppStore } from './store/appStore';
 import { db } from './db/database';
@@ -41,6 +42,7 @@ export default function App() {
           <Route path="ai" element={<AIAssistantPage />} />
           <Route path="outline" element={<OutlinePage />} />
           <Route path="tags" element={<TagsPage />} />
+          <Route path="about" element={<AboutPage />} />
         </Route>
       </Routes>
       <ElectronIntegration />

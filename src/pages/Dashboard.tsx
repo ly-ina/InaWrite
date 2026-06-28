@@ -12,22 +12,24 @@ import { useForeshadowStore } from '../store/foreshadowStore';
 import { STATUS_LABELS } from '../types';
 import { createAutoBackup, getBackupList, deleteBackup, restoreFromFile, generateReport } from '../utils/backup';
 import { exportProject, downloadJSON } from '../utils/importExport';
+import { useT } from '../i18n';
 import type { BackupMeta } from '../utils/backup';
 import WritingCalendar from '../components/WritingCalendar';
 import styles from './Dashboard.module.css';
 
-/** 快捷操作按钮配置 */
-const QUICK_ACTIONS = [
-  { label: '新角色', icon: '👤', path: '/characters' },
-  { label: '新章节', icon: '📖', path: '/chapters' },
-  { label: '新伏笔', icon: '🔮', path: '/foreshadows' },
-  { label: '新设定', icon: '🌍', path: '/worldsettings' },
-  { label: '模板', icon: '📦', path: '/templates' },
-];
-
 export default function DashboardPage() {
   const { currentProject, refreshKey } = useAppStore();
   const { characters, loadCharacters } = useCharacterStore();
+  const { t } = useT();
+
+  /** 快捷操作按钮配置 */
+  const QUICK_ACTIONS = [
+    { label: t('quick.newChar'), icon: '👤', path: '/characters' },
+    { label: t('quick.newChapter'), icon: '📖', path: '/chapters' },
+    { label: t('quick.newForeshadow'), icon: '🔮', path: '/foreshadows' },
+    { label: t('quick.newSetting'), icon: '🌍', path: '/worldsettings' },
+    { label: t('quick.templates'), icon: '📦', path: '/templates' },
+  ];
   const { chapters, loadChapters } = useChapterStore();
   const { foreshadows, loadForeshadows } = useForeshadowStore();
   const navigate = useNavigate();
@@ -60,7 +62,7 @@ export default function DashboardPage() {
   }, [showBackups]);
 
   if (!currentProject) {
-    return <div className="empty-state"><p>请先选择一个作品</p></div>;
+    return <div className="empty-state"><p>{t('common.selectProject')}</p></div>;
   }
 
   // 统计数据
@@ -113,14 +115,14 @@ export default function DashboardPage() {
 
   // 恢复备份
   const handleRestore = async (projectId: string) => {
-    if (!window.confirm('确定要从此备份恢复数据吗？当前数据将被覆盖。')) return;
+    if (!window.confirm(t('dashboard.confirmRestore'))) return;
     const json = localStorage.getItem(`novelkb_backup_${projectId}`);
     if (!json) return;
     try {
       const data = JSON.parse(json);
       const { executeImport } = await import('../utils/importExport');
       await executeImport(currentProject.id, data, true);
-      alert('数据恢复成功！');
+      alert(t('dashboard.restoreSuccess'));
       // 刷新页面
       window.location.reload();
     } catch {
@@ -146,7 +148,7 @@ export default function DashboardPage() {
           <p className={styles.desc}>{currentProject.description}</p>
         )}
         <p className={styles.meta}>
-          创建于 {formatDate(currentProject.createdAt)} · 最后编辑于 {formatDate(currentProject.updatedAt)}
+          {t('dashboard.createdEdited').replace('{created}', formatDate(currentProject.createdAt)).replace('{edited}', formatDate(currentProject.updatedAt))}
         </p>
       </div>
 
@@ -156,9 +158,9 @@ export default function DashboardPage() {
       {/* 写作目标 */}
       <section className={styles.section}>
         <div className={styles.goalHeader}>
-          <h3>🎯 写作目标</h3>
+          <h3>🎯 {t('dashboard.goal')}</h3>
           <button className="btn btn-sm" onClick={() => { setGoalInput(String(wordGoal)); setShowGoalEdit(true); }}>
-            修改目标
+            {t('dashboard.goalSet')}
           </button>
         </div>
         <div className={styles.goalBar}>
@@ -171,14 +173,14 @@ export default function DashboardPage() {
         <div className={styles.goalInfo}>
           <span>{totalWords.toLocaleString()} / {wordGoal.toLocaleString()} 字</span>
           <span className={styles.goalRemain}>
-            {totalWords >= wordGoal ? '🎉 目标达成！' : `还差 ${(wordGoal - totalWords).toLocaleString()} 字`}
+            {totalWords >= wordGoal ? t('dashboard.goalReached') : `${t('dashboard.goalRemain')} ${(wordGoal - totalWords).toLocaleString()} ${t('chap.wordCount')}`}
           </span>
         </div>
       </section>
 
       {/* 数据统计卡片 */}
       <section className={styles.section}>
-        <h3>数据概览</h3>
+        <h3>{t('dashboard.stats')}</h3>
         <div className={styles.statsGrid}>
           {statsCards.map((card) => (
             <div key={card.label} className={styles.statCard}>
@@ -194,7 +196,7 @@ export default function DashboardPage() {
 
       {/* 快捷操作 */}
       <section className={styles.section}>
-        <h3>快捷操作</h3>
+        <h3>{t('dashboard.quickActions')}</h3>
         <div className={styles.quickActions}>
           {QUICK_ACTIONS.map((action) => (
             <button key={action.label} className={styles.quickBtn} onClick={() => navigate(action.path)}>
@@ -208,12 +210,12 @@ export default function DashboardPage() {
       {/* 章节进度 */}
       {chapters.length > 0 && (
         <section className={styles.section}>
-          <h3>章节进度</h3>
+          <h3>{t('dashboard.chapterProgress')}</h3>
           <div className={styles.progressBar}>
             <div className={styles.progressFill} style={{ width: `${(completedChapters / chapters.length) * 100}%` }} />
           </div>
           <div className={styles.progressText}>
-            {completedChapters} / {chapters.length} 章已完成
+            {t('dashboard.chaptersDone').replace('{done}', String(completedChapters)).replace('{total}', String(chapters.length))}
           </div>
           <div className={styles.chapterPreview}>
             {chapters.slice(-5).map((ch) => (
@@ -231,24 +233,24 @@ export default function DashboardPage() {
       {/* 备份管理 */}
       <section className={styles.section}>
         <div className={styles.goalHeader}>
-          <h3>💾 数据安全</h3>
+          <h3>{t('dashboard.backup')}</h3>
         </div>
         <div className={styles.backupActions}>
-          <button className="btn btn-sm" onClick={handleBackup}>立即备份</button>
-          <button className="btn btn-sm" onClick={handleExportReport}>导出创作报告</button>
+          <button className="btn btn-sm" onClick={handleBackup}>{t('dashboard.backupNow')}</button>
+          <button className="btn btn-sm" onClick={handleExportReport}>{t('dashboard.exportReport')}</button>
           <label className="btn btn-sm" style={{ cursor: 'pointer' }}>
-            从文件恢复
+            {t('dashboard.restoreFile')}
             <input type="file" accept=".json" style={{ display: 'none' }} onChange={handleFileRestore} />
           </label>
           <button className="btn btn-sm" onClick={() => setShowBackups(!showBackups)}>
-            {showBackups ? '隐藏' : '查看'}备份记录 ({backups.length})
+            {showBackups ? t('common.hide') : t('common.view')}{t('dashboard.backupRecords')} ({backups.length})
           </button>
         </div>
 
         {showBackups && (
           <div className={styles.backupList}>
             {backups.length === 0 ? (
-              <p className={styles.muted}>暂无备份记录</p>
+              <p className={styles.muted}>{t('dashboard.noBackups')}</p>
             ) : (
               backups.map((b) => (
                 <div key={b.projectId + b.timestamp} className={styles.backupItem}>
@@ -277,13 +279,13 @@ export default function DashboardPage() {
       {characters.length === 0 && chapters.length === 0 && foreshadows.length === 0 && (
         <div className="empty-state">
           <div className="icon">🚀</div>
-          <p>作品还是空的，开始添加内容吧！</p>
+          <p>{t('dashboard.emptyProject')}</p>
           <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
             <button className="btn btn-primary" onClick={() => navigate('/characters')}>
-              + 创建第一个角色
+              {t('dashboard.createFirstChar')}
             </button>
             <button className="btn" onClick={() => navigate('/chapters')}>
-              + 写第一章
+              {t('dashboard.writeFirstChapter')}
             </button>
           </div>
         </div>
@@ -293,17 +295,17 @@ export default function DashboardPage() {
       {showGoalEdit && (
         <div className="modal-overlay" onClick={() => setShowGoalEdit(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h2>设置写作目标</h2>
+            <h2>{t('dashboard.setGoal')}</h2>
             <div className="form-group">
-              <label>目标总字数</label>
+              <label>{t('dashboard.targetWordCount')}</label>
               <input className="input" type="number" value={goalInput}
                 onChange={(e) => setGoalInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && saveGoal()}
                 autoFocus />
             </div>
             <div className="form-actions">
-              <button className="btn" onClick={() => setShowGoalEdit(false)}>取消</button>
-              <button className="btn btn-primary" onClick={saveGoal}>保存</button>
+              <button className="btn" onClick={() => setShowGoalEdit(false)}>{t('common.cancel')}</button>
+              <button className="btn btn-primary" onClick={saveGoal}>{t('common.save')}</button>
             </div>
           </div>
         </div>

@@ -77,6 +77,19 @@
   color: var(--accent);
 }
 
+/* ========== 移动端滑出菜单 ========== */
+.mobileOverlay {
+  display: none;
+}
+
+.mobileCloseBtn {
+  display: none;
+}
+
+.mobileMenuBtn {
+  display: none;
+}
+
 /* 移动端：返回按钮始终可见 */
 @media (max-width: 768px) {
   .backBtn {
@@ -85,6 +98,114 @@
     font-size: 13px;
     border-bottom: 1px solid var(--border-color);
     flex-shrink: 0;
+  }
+
+  /* 侧边栏移动端状态（位置/尺寸由内联 style 控制） */
+  .sidebar.mobileOpen {
+    /* 内联 style 已处理 transform */
+  }
+
+  /* 侧边栏头部恢复显示 */
+  .sidebarHeader {
+    display: flex !important;
+    padding: 12px;
+    border-bottom: 1px solid var(--border-color);
+    height: auto;
+    min-height: 44px;
+  }
+
+  /* 导航竖向排列 */
+  .nav {
+    flex-direction: column !important;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 8px;
+    gap: 2px;
+    flex: 1;
+  }
+
+  .navItem {
+    flex: none;
+    justify-content: flex-start;
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+
+  .navLabel {
+    font-size: 14px;
+  }
+
+  /* 底部工具栏竖向排列 */
+  .sidebarFooter {
+    display: flex !important;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px;
+    border-top: 1px solid var(--border-color);
+    border-bottom: none;
+  }
+
+  .sidebarFooter .themeToggle {
+    width: 100%;
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+
+  /* 遮罩层 */
+  .mobileOverlay {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 250;
+    background: rgba(0,0,0,0.4);
+  }
+
+  /* 关闭按钮 */
+  .mobileCloseBtn {
+    display: flex;
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 10;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: var(--bg-hover);
+    color: var(--text-secondary);
+    border: none;
+    font-size: 14px;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* 菜单按钮（在面包屑中） */
+  .mobileMenuBtn {
+    display: flex;
+    width: 32px;
+    height: 32px;
+    margin-right: 8px;
+    flex-shrink: 0;
+    border-radius: 6px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    font-size: 16px;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* 主内容区 */
+  .mainWrapper {
+    padding-top: 0;
+  }
+
+  .breadcrumb {
+    padding-left: 50px;
   }
 }
 

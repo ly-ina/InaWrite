@@ -4,6 +4,7 @@
   flex-direction: column;
   color: var(--text-primary);
   background: var(--bg-primary);
+  overflow: hidden;
 }
 
 /* ========== 标签页 ========== */
@@ -12,6 +13,7 @@
   gap: 8px;
   margin-bottom: 16px;
   flex-wrap: wrap;
+  flex-shrink: 0;
 }
 
 .tab {
@@ -50,6 +52,8 @@
 .tabContent {
   flex: 1;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  min-height: 0;
 }
 
 /* ========== 错误提示 ========== */
@@ -453,9 +457,34 @@
 
 /* ========== 移动端适配 ========== */
 @media (max-width: 768px) {
-  .container {
-    padding: 0;
+  .page {
     height: auto;
+    overflow: visible;
+  }
+
+  .tabs {
+    flex-shrink: 0;
+    gap: 4px;
+  }
+
+  .tab {
+    flex: 1 1 calc(33.33% - 4px);
+    min-width: 0;
+    padding: 8px 10px;
+  }
+
+  .tabLabel {
+    font-size: 12px;
+  }
+
+  .tabDesc {
+    display: none;
+  }
+
+  .tabContent {
+    flex: none;
+    overflow-y: visible;
+    min-height: 0;
   }
 
   .chatLayout {

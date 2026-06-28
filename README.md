@@ -392,14 +392,15 @@ Novel InaKB 内置 AI 写作助手，支持两种协作方式：
 - [x] **移动端适配**：响应式布局 + Android APK
   - 顶部横向可滚动导航标签栏（11 个模块）
   - 底部工具栏：导入/导出/主题切换/中英文切换
-  - 双栏布局自动转为上下排列（列表 35vh + 详情区）
+  - **全屏详情覆盖层**：角色/世界观/资源页面选择后弹出全屏详情（优化小屏阅读体验）
   - 模态框底部弹出（类似 iOS ActionSheet）
   - Dashboard 统计卡片 3 列网格自适应
   - 看板/大纲/时间线纵向排列适配
   - 输入框 16px 字体防止 iOS 自动缩放
   - 100dvh 动态视口高度适配浏览器地址栏
-  - **Android APK 打包**：Capacitor 构建，debug APK 约 4.8MB
+  - **Android APK 打包**：Capacitor 构建，自定义签名（支持覆盖安装），debug APK 约 4.8MB
   - PWA manifest + Service Worker 离线可用
+  - 安全区域适配（状态栏 padding-top 24px）
 - [ ] **云同步增强**：支持更多云存储后端
   - OneDrive / Google Drive / Dropbox
   - 端到端加密

@@ -18,6 +18,14 @@ export default function ResourcesPage() {
   const { characters, loadCharacters, updateCharacter } = useCharacterStore();
   const { chapters, loadChapters } = useChapterStore();
 
+  // 移动端检测
+  const [isMobileView, setIsMobileView] = useState(() => window.innerWidth <= 768);
+  useEffect(() => {
+    const check = () => setIsMobileView(window.innerWidth <= 768);
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
   const [viewMode, setViewMode] = useState<ViewMode>('byCharacter');
   const [selectedCharId, setSelectedCharId] = useState<string | null>(null);
   const [filterType, setFilterType] = useState('');
@@ -169,6 +177,7 @@ export default function ResourcesPage() {
           </div>
 
           {/* 右侧资源详情 */}
+          {!isMobileView && (
           <div className={styles.detailPanel}>
             {!selectedChar ? (
               <div className="empty-state">
@@ -297,8 +306,140 @@ export default function ResourcesPage() {
               </div>
             )}
           </div>
+          )}
         </div>
       ) : (
+        // 占位：全局视图在下方独立渲染
+        null
+      )}
+
+      {/* 移动端全屏资源详情覆盖层 */}
+      {isMobileView && viewMode === 'byCharacter' && selectedChar && (
+        <div className={`detail-full-overlay ${styles.mobileOverlay}`}>
+          <div className={`detail-full-panel ${styles.mobileDetailPanel}`}>
+            <div className={`detail-full-nav ${styles.mobileDetailNav}`}>
+              <button className={`detail-full-back ${styles.mobileBackBtn}`} onClick={() => setSelectedCharId(null)}>
+                ← 返回列表
+              </button>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button className="btn btn-primary btn-sm" onClick={() => { resetForm(); setShowAdd(true); }}>
+                  + 添加资源
+                </button>
+              </div>
+            </div>
+            <div className={`detail-full-body ${styles.mobileDetailBody}`}>
+              <div className={styles.charHeader}>
+                <div className={styles.charAvatarLarge}>{selectedChar.name.charAt(0)}</div>
+                <div>
+                  <h2>{selectedChar.name}</h2>
+                  <div className={styles.charMeta}>
+                    共 {selectedChar.resources.length} 项资源/能力
+                  </div>
+                </div>
+              </div>
+              {selectedChar.resources.length === 0 && !showAdd ? (
+                <div className="empty-state" style={{ padding: '30px' }}>
+                  <p>该角色还没有资源/能力</p>
+                  <button className="btn btn-primary btn-sm" onClick={() => { resetForm(); setShowAdd(true); }}>
+                    + 添加资源
+                  </button>
+                </div>
+              ) : (
+                <div className={styles.resourceGrid}>
+                  {selectedChar.resources.map((res) => (
+                    <div key={res.id} className={styles.resCard}>
+                      <div className={styles.resHeader}>
+                        <span className={styles.resName}>{res.name}</span>
+                        <span className={styles.resType}>{res.type}</span>
+                        <span className={`${styles.resStatus} ${styles[`status${res.status}`] || ''}`}>
+                          {res.status}
+                        </span>
+                      </div>
+                      {res.description && (
+                        <div className={styles.resDesc}>{res.description}</div>
+                      )}
+                      {res.obtainedAt && (
+                        <div className={styles.resObtained}>📅 {res.obtainedAt}</div>
+                      )}
+                      {res.cost && (
+                        <div className={styles.resCost}>
+                          <span className={styles.costLabel}>代价：</span>
+                          {res.cost}
+                        </div>
+                      )}
+                      <div style={{ display: 'flex', gap: '4px', marginTop: '8px' }}>
+                        <button className="btn btn-sm btn-ghost" onClick={() => openEdit(res)}
+                          style={{ color: 'var(--accent)', fontSize: '11px' }}>编辑</button>
+                        <button className="btn btn-sm btn-ghost" onClick={() => handleDelete(res.id)}
+                          style={{ color: 'var(--danger)', fontSize: '11px' }}>删除</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 添加/编辑资源弹窗（共用） */}
+      {showAdd && selectedChar && (
+        <div className="modal-overlay" onClick={resetForm}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h2>{editingResId ? '编辑资源' : `为「${selectedChar.name}」添加资源`}</h2>
+            <div className="form-group">
+              <label>名称 *</label>
+              <input className="input" value={resName} onChange={(e) => setResName(e.target.value)}
+                placeholder="资源/能力名称" autoFocus />
+            </div>
+            <div className="form-group">
+              <label>类型</label>
+              <select className="select" value={resType}
+                onChange={(e) => setResType(e.target.value as Resource['type'])}>
+                <option value="能力">能力</option>
+                <option value="物品">物品</option>
+                <option value="代价">代价</option>
+                <option value="其他">其他</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label>状态</label>
+              <select className="select" value={resStatus}
+                onChange={(e) => setResStatus(e.target.value as ResourceStatus)}>
+                <option value="未获得">未获得</option>
+                <option value="已获得">已获得</option>
+                <option value="已消耗">已消耗</option>
+                <option value="进行中">进行中</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label>描述</label>
+              <textarea className="textarea" value={resDesc}
+                onChange={(e) => setResDesc(e.target.value)} rows={3} />
+            </div>
+            <div className="form-group">
+              <label>获取时间/章节</label>
+              <input className="input" value={resObtainedAt}
+                onChange={(e) => setResObtainedAt(e.target.value)}
+                placeholder="可选" />
+            </div>
+            <div className="form-group">
+              <label>代价</label>
+              <input className="input" value={resCost}
+                onChange={(e) => setResCost(e.target.value)}
+                placeholder="使用代价（可选）" />
+            </div>
+            <div className="form-actions">
+              <button className="btn" onClick={resetForm}>取消</button>
+              <button className="btn btn-primary" onClick={handleSave} disabled={!resName.trim()}>
+                {editingResId ? '保存' : '添加'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {viewMode === 'global' && (
         // 全局资源表视图
         <div className={styles.globalView}>
           <div className={styles.globalFilters}>

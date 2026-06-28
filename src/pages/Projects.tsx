@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useProjectStore } from '../store/projectStore';
 import { useAppStore } from '../store/appStore';
+import { useT } from '../i18n';
 import type { Project } from '../types';
 import { exportProject, downloadJSON, readJSONFile, detectConflicts, executeImport, type ImportConflict } from '../utils/importExport';
 import type { ProjectExport } from '../types';
@@ -16,6 +17,7 @@ export default function ProjectsPage() {
   const navigate = useNavigate();
   const { projects, loading, loadProjects, createProject, deleteProject } = useProjectStore();
   const { setCurrentProject } = useAppStore();
+  const { t } = useT();
 
   // 创建项目模态框
   const [showCreate, setShowCreate] = useState(false);
@@ -52,7 +54,7 @@ export default function ProjectsPage() {
 
   /** 删除项目 */
   const handleDelete = async (id: string, name: string) => {
-    if (!window.confirm(`确定要删除「${name}」吗？此操作不可恢复，会同时删除该作品下的所有角色、章节和伏笔数据。`)) return;
+    if (!window.confirm(t('project.confirmDelete').replace('{name}', name))) return;
     await deleteProject(id);
   };
 
@@ -64,7 +66,7 @@ export default function ProjectsPage() {
       downloadJSON(json, filename);
     } catch (error) {
       console.error('导出失败:', error);
-      alert('导出失败，请重试');
+      alert(t('project.exportFailed'));
     }
   };
 
@@ -81,10 +83,10 @@ export default function ProjectsPage() {
         setImportTargetProjectId(project.id);
       } else {
         await executeImport(project.id, data, false);
-        alert('导入成功！');
+        alert(t('project.importSuccess'));
       }
     } catch (error) {
-      alert(error instanceof Error ? error.message : '导入失败');
+      alert(error instanceof Error ? error.message : t('project.importFailed'));
     }
     // 重置文件选择器
     e.target.value = '';
@@ -95,11 +97,11 @@ export default function ProjectsPage() {
     if (!importData) return;
     try {
       await executeImport(importTargetProjectId, importData, overwrite);
-      alert('导入成功！');
+      alert(t('project.importSuccess'));
       setImportConflicts([]);
       setImportData(null);
     } catch (error) {
-      alert('导入失败，请重试');
+      alert(t('project.importRetry'));
     }
   };
 
@@ -113,21 +115,21 @@ export default function ProjectsPage() {
     <div className={styles.page}>
       {/* 页面标题 */}
       <div className="page-header">
-        <h1>我的作品</h1>
-        <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
-          + 新建作品
-        </button>
+        <h1>{t('project.title')}</h1>
+          <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
+            {t('project.new')}
+          </button>
       </div>
 
       {/* 项目列表 */}
       {loading ? (
-        <div className="loading-spinner">加载中...</div>
+        <div className="loading-spinner">{t('common.loading')}</div>
       ) : projects.length === 0 ? (
         <div className="empty-state">
           <div className="icon">📚</div>
           <p>还没有作品，开始创作你的第一个故事吧</p>
           <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
-            + 新建作品
+            {t('project.createFirst')}
           </button>
         </div>
       ) : (
@@ -144,26 +146,26 @@ export default function ProjectsPage() {
               <div className={styles.cardBody}>
                 <h3 className={styles.cardTitle}>{project.name}</h3>
                 <p className={styles.cardDesc}>
-                  {project.description || '暂无简介'}
+                  {project.description || t('common.noDescription')}
                 </p>
                 <div className={styles.cardMeta}>
-                  <span>最后编辑：{formatDate(project.updatedAt)}</span>
+                  <span>{t('project.updatedAt')}：{formatDate(project.updatedAt)}</span>
                 </div>
                 <div className={styles.cardActions}>
                   <button
                     className="btn btn-primary btn-sm"
                     onClick={() => handleEnterProject(project)}
                   >
-                    进入
+                    {t('project.enter')}
                   </button>
                   <button
                     className="btn btn-sm"
                     onClick={() => handleExport(project)}
                   >
-                    导出
+                    {t('common.export')}
                   </button>
                   <label className="btn btn-sm" style={{ cursor: 'pointer' }}>
-                    导入
+                    {t('common.import')}
                     <input
                       type="file"
                       accept=".json"
@@ -175,7 +177,7 @@ export default function ProjectsPage() {
                     className="btn btn-danger btn-sm"
                     onClick={() => handleDelete(project.id, project.name)}
                   >
-                    删除
+                    {t('common.delete')}
                   </button>
                 </div>
               </div>
@@ -188,32 +190,32 @@ export default function ProjectsPage() {
       {showCreate && (
         <div className="modal-overlay" onClick={() => setShowCreate(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h2>新建作品</h2>
+            <h2>{t('project.createTitle')}</h2>
             <div className="form-group">
-              <label>作品名称 *</label>
+              <label>{t('project.name')} *</label>
               <input
                 className="input"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
-                placeholder="输入作品名称..."
+                placeholder={t('project.namePlaceholder')}
                 autoFocus
                 onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
               />
             </div>
             <div className="form-group">
-              <label>简介</label>
+              <label>{t('project.desc')}</label>
               <textarea
                 className="textarea"
                 value={newDesc}
                 onChange={(e) => setNewDesc(e.target.value)}
-                placeholder="简单描述一下这个故事..."
+                placeholder={t('project.descPlaceholder')}
                 rows={3}
               />
             </div>
             <div className="form-actions">
-              <button className="btn" onClick={() => setShowCreate(false)}>取消</button>
+              <button className="btn" onClick={() => setShowCreate(false)}>{t('common.cancel')}</button>
               <button className="btn btn-primary" onClick={handleCreate} disabled={!newName.trim()}>
-                创建
+                {t('common.create')}
               </button>
             </div>
           </div>
@@ -224,21 +226,21 @@ export default function ProjectsPage() {
       {importConflicts.length > 0 && (
         <div className="modal-overlay">
           <div className="modal" style={{ maxWidth: '550px' }}>
-            <h2>检测到数据冲突</h2>
+            <h2>{t('project.conflictTitle')}</h2>
             <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '12px' }}>
-              以下 {importConflicts.length} 条数据与现有数据冲突：
+              {t('project.conflictDesc').replace('{n}', String(importConflicts.length))}
             </p>
             <div style={{ maxHeight: '200px', overflow: 'auto', marginBottom: '12px' }}>
               {importConflicts.map((c, i) => (
                 <div key={i} style={{ fontSize: '13px', padding: '6px 0', color: 'var(--text-secondary)', borderBottom: i < importConflicts.length - 1 ? '1px solid var(--border)' : 'none' }}>
                   <span style={{ fontWeight: 600 }}>
-                    [{c.type === 'character' ? '角色' : c.type === 'chapter' ? '章节' : c.type === 'foreshadow' ? '伏笔' : '设定'}]
+                    [{c.type === 'character' ? t('nav.characters') : c.type === 'chapter' ? t('nav.chapters') : c.type === 'foreshadow' ? t('nav.foreshadows') : t('nav.worldsettings')}]
                   </span>
                   {' '}
                   {c.existingName && <span style={{ color: 'var(--accent)' }}>{c.existingName}</span>}
                   {c.matchType === 'name' && (
                     <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginLeft: '6px' }}>
-                      (同名匹配)
+                      {t('project.nameMatch')}
                     </span>
                   )}
                   {c.matchType === 'id' && (
@@ -250,12 +252,12 @@ export default function ProjectsPage() {
               ))}
             </div>
             <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '16px' }}>
-              选择「覆盖」将用导入数据更新现有数据，选择「跳过」将只添加不冲突的新数据。
+              {t('project.conflictHint')}
             </p>
             <div className="form-actions" style={{ borderTop: 'none', paddingTop: 0 }}>
-              <button className="btn" onClick={() => setImportConflicts([])}>取消导入</button>
-              <button className="btn" onClick={() => handleConfirmImport(false)}>跳过冲突</button>
-              <button className="btn btn-primary" onClick={() => handleConfirmImport(true)}>覆盖导入</button>
+              <button className="btn" onClick={() => setImportConflicts([])}>{t('project.cancelImport')}</button>
+              <button className="btn" onClick={() => handleConfirmImport(false)}>{t('project.skipConflicts')}</button>
+              <button className="btn btn-primary" onClick={() => handleConfirmImport(true)}>{t('project.overwriteImport')}</button>
             </div>
           </div>
         </div>

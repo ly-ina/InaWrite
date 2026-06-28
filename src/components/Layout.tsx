@@ -3,7 +3,7 @@
  * 左侧导航栏（根据是否在项目内切换菜单） + 顶部面包屑 + 主内容区
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAppStore } from '../store/appStore';
 import { useProjectStore } from '../store/projectStore';
@@ -14,40 +14,40 @@ import GlobalSearch from './GlobalSearch';
 import ShortcutPanel from './ShortcutPanel';
 import styles from './Layout.module.css';
 
-/** 顶级导航：项目列表 */
-const TOP_NAV = [
-  { path: '/projects', label: '作品', icon: '📚' },
-];
+function isMobile() { return window.innerWidth <= 768; }
 
-/** 项目内子模块导航（进入项目后显示） */
-const PROJECT_NAV = [
-  { path: '/dashboard', label: '概览', icon: '🏠' },
-  { path: '/outline', label: '大纲', icon: '📋' },
-  { path: '/characters', label: '角色', icon: '👤' },
-  { path: '/chapters', label: '章节', icon: '📖' },
-  { path: '/timeline', label: '时间线', icon: '📅' },
-  { path: '/foreshadows', label: '伏笔', icon: '🔮' },
-  { path: '/worldsettings', label: '世界观', icon: '🌍' },
-  { path: '/resources', label: '资源', icon: '💎' },
-  { path: '/templates', label: '模板', icon: '📦' },
-  { path: '/tags', label: '标签', icon: '🏷' },
-  { path: '/ai', label: 'AI 助手', icon: '🤖' },
-];
+/** 导航 key 映射到翻译 key */
+const NAV_I18N_MAP: Record<string, { labelKey: string; icon: string }> = {
+  '/projects':  { labelKey: 'nav.projects', icon: '📚' },
+  '/dashboard': { labelKey: 'nav.dashboard', icon: '🏠' },
+  '/outline':   { labelKey: 'nav.outline', icon: '📋' },
+  '/characters': { labelKey: 'nav.characters', icon: '👤' },
+  '/chapters':  { labelKey: 'nav.chapters', icon: '📖' },
+  '/timeline':  { labelKey: 'nav.timeline', icon: '📅' },
+  '/foreshadows': { labelKey: 'nav.foreshadows', icon: '🔮' },
+  '/worldsettings': { labelKey: 'nav.worldsettings', icon: '🌍' },
+  '/resources': { labelKey: 'nav.resources', icon: '💎' },
+  '/templates': { labelKey: 'nav.templates', icon: '📦' },
+  '/tags':      { labelKey: 'nav.tags', icon: '🏷' },
+  '/ai':        { labelKey: 'nav.ai', icon: '🤖' },
+  '/about':     { labelKey: 'nav.about', icon: 'ℹ️' },
+};
 
-/** 面包屑路径映射 */
-const BREADCRUMB_MAP: Record<string, string> = {
-  '/projects': '作品列表',
-  '/dashboard': '概览',
-  '/outline': '大纲编辑器',
-  '/characters': '角色管理',
-  '/chapters': '章节管理',
-  '/foreshadows': '伏笔追踪',
-  '/timeline': '章节时间线',
-  '/worldsettings': '世界观设定',
-  '/resources': '资源追踪',
-  '/templates': '模板与导入导出',
-  '/tags': '标签管理',
-  '/ai': 'AI 写作助手',
+/** 面包屑路径映射到翻译 key */
+const BREADCRUMB_I18N_MAP: Record<string, string> = {
+  '/projects': 'breadcrumb.projects',
+  '/dashboard': 'breadcrumb.dashboard',
+  '/outline': 'breadcrumb.outline',
+  '/characters': 'breadcrumb.characters',
+  '/chapters': 'breadcrumb.chapters',
+  '/foreshadows': 'breadcrumb.foreshadows',
+  '/timeline': 'breadcrumb.timeline',
+  '/worldsettings': 'breadcrumb.worldsettings',
+  '/resources': 'breadcrumb.resources',
+  '/templates': 'breadcrumb.templates',
+  '/tags': 'breadcrumb.tags',
+  '/ai': 'breadcrumb.ai',
+  '/about': 'breadcrumb.about',
 };
 
 export default function Layout() {
@@ -59,22 +59,89 @@ export default function Layout() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importMsg, setImportMsg] = useState('');
 
+  // 移动端侧边栏滑出
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [isMobileView, setIsMobileView] = useState(() => window.innerWidth <= 768);
+  const mainRef = useRef<HTMLDivElement>(null);
+  const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
+
+  // 监听窗口大小变化（延迟检测确保 WebView 正确初始化）
+  useEffect(() => {
+    const check = () => setIsMobileView(window.innerWidth <= 768);
+    // 立即检测一次
+    check();
+    // 延迟再检测一次（WebView 可能晚初始化）
+    setTimeout(check, 500);
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
+  // Pointer Events 手势（兼容所有平台：鼠标 + 触摸 + 触控笔）
+  useEffect(() => {
+    let startX = 0;
+    let startY = 0;
+    let tracking = false;
+
+    const onDown = (e: PointerEvent) => {
+      startX = e.clientX;
+      startY = e.clientY;
+      tracking = true;
+      (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+    };
+
+    const onMove = (e: PointerEvent) => {
+      if (!tracking) return;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      // 从左边缘（<40px）向右滑动 >30px 打开侧边栏
+      if (dx > 30 && Math.abs(dx) > Math.abs(dy) * 1.5 && startX < 40 && !mobileSidebarOpen) {
+        setMobileSidebarOpen(true);
+        tracking = false;
+      }
+      // 向左滑动关闭
+      if (dx < -30 && Math.abs(dx) > Math.abs(dy) * 1.5 && mobileSidebarOpen) {
+        setMobileSidebarOpen(false);
+        tracking = false;
+      }
+    };
+
+    const onUp = () => { tracking = false; };
+
+    document.addEventListener('pointerdown', onDown);
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
+    return () => {
+      document.removeEventListener('pointerdown', onDown);
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+    };
+  }, [mobileSidebarOpen]);
+
   // 判断当前是否在项目内（有选中项目 + 不在作品列表页）
   const isInProject = currentProject !== null && location.pathname !== '/projects';
 
-  // 当前使用的导航项
-  const navItems = isInProject ? PROJECT_NAV : TOP_NAV;
+  // 类型安全的 t() 包装（用于动态 key）
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const td = (key: string): string => (t as any)(key);
+
+  // 当前使用的导航项（动态生成以使用 t()）
+  const navItems = isInProject
+    ? Object.entries(NAV_I18N_MAP)
+        .filter(([path]) => path !== '/projects')
+        .map(([path, { labelKey, icon }]) => ({ path, label: td(labelKey), icon }))
+    : [{ path: '/projects', label: t('nav.projects'), icon: '📚' }];
 
   // 生成面包屑
   const breadcrumbParts: { label: string; path?: string }[] = [];
   if (isInProject) {
     breadcrumbParts.push({ label: currentProject!.name, path: '/dashboard' });
-    const currentLabel = BREADCRUMB_MAP[location.pathname];
-    if (currentLabel && location.pathname !== '/dashboard') {
-      breadcrumbParts.push({ label: currentLabel });
+    const currentBreadcrumbKey = BREADCRUMB_I18N_MAP[location.pathname];
+    if (currentBreadcrumbKey && location.pathname !== '/dashboard') {
+      breadcrumbParts.push({ label: td(currentBreadcrumbKey) });
     }
   } else {
-    breadcrumbParts.push({ label: '作品列表' });
+    breadcrumbParts.push({ label: t('breadcrumb.projects') });
   }
 
   /** 返回作品列表 */
@@ -97,7 +164,7 @@ export default function Layout() {
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error('导出失败:', err);
-      alert('导出失败');
+      alert(t('project.exportFailed'));
     }
   };
 
@@ -108,7 +175,7 @@ export default function Layout() {
     setImportMsg('');
     try {
       const data = await readJSONFile(file);
-      if (!data) { setImportMsg('文件格式无效'); return; }
+      if (!data) { setImportMsg(t('project.invalidFormat')); return; }
       // 如果是完整导出且有 project 信息
       if (data.project) {
         // 先创建/更新项目
@@ -133,7 +200,7 @@ export default function Layout() {
         }
         triggerRefresh();
       } else {
-        setImportMsg('文件格式不支持（需要完整导出格式）');
+        setImportMsg(t('project.unsupportedFormat'));
       }
     } catch (err) {
       setImportMsg('导入失败：' + (err instanceof Error ? err.message : '未知错误'));
@@ -148,13 +215,34 @@ export default function Layout() {
   }, [theme]);
 
   return (
-    <div className={styles.layout} data-theme={theme}>
+    <div className={`novel-layout ${styles.layout}`} data-theme={theme}>
       {/* 全局搜索（Ctrl+K） */}
       <GlobalSearch />
       {/* 快捷键面板（?） */}
       <ShortcutPanel />
+
+      {/* 移动端侧边栏遮罩 */}
+      {mobileSidebarOpen && (
+        <div className="mobile-overlay" onClick={() => setMobileSidebarOpen(false)} />
+      )}
+
       {/* 左侧导航栏 */}
-      <aside className={`${styles.sidebar} ${sidebarCollapsed ? styles.collapsed : ''}`}>
+      <aside
+        className={`sf-sidebar ${styles.sidebar} ${sidebarCollapsed ? styles.collapsed : ''} ${mobileSidebarOpen ? 'open' : ''}`}
+      >
+        {/* 移动端关闭按钮 */}
+        <button
+          onClick={() => setMobileSidebarOpen(false)}
+          style={{
+            position: 'absolute', top: 10, right: 10, zIndex: 10,
+            width: 30, height: 30, borderRadius: '50%',
+            background: 'var(--bg-hover)', color: 'var(--text-secondary)',
+            border: 'none', fontSize: 14, cursor: 'pointer',
+            display: isMobileView ? 'flex' : 'none',
+            alignItems: 'center', justifyContent: 'center',
+          }}
+        >✕</button>
+
         <div className={styles.sidebarHeader}>
           {!sidebarCollapsed && (
             <h1 className={styles.logo} onClick={() => navigate('/')}>
@@ -169,7 +257,7 @@ export default function Layout() {
         {/* 返回作品列表按钮（在项目内时显示，移动端始终显示） */}
         {isInProject && (
           <button className={styles.backBtn} onClick={handleBackToProjects}>
-            ← 返回作品列表
+            {t('nav.backToProjects')}
           </button>
         )}
 
@@ -196,45 +284,70 @@ export default function Layout() {
           ))}
         </nav>
 
-        <div className={styles.sidebarFooter}>
-          {!sidebarCollapsed && (
-            <>
-              {/* 导入导出 */}
-              {currentProject && (
-                <>
-                  <button className={styles.themeToggle} onClick={handleExportCurrent} title="导出当前作品">
-                    📤 导出作品
-                  </button>
-                </>
-              )}
-              <button className={styles.themeToggle} onClick={() => fileInputRef.current?.click()} title="导入作品文件">
-                📥 导入作品
-              </button>
-              <input ref={fileInputRef} type="file" accept=".json" style={{ display: 'none' }}
-                onChange={handleImportFile} />
-              {importMsg && (
-                <div style={{
-                  fontSize: '11px', color: importMsg.startsWith('✅') ? 'var(--accent)' : 'var(--danger)',
-                  marginTop: '4px', textAlign: 'center', wordBreak: 'break-all'
-                }}>
-                  {importMsg}
-                </div>
-              )}
-              <div style={{ margin: '4px 0', borderTop: '1px solid var(--border-color)' }} />
-              <button className={styles.themeToggle} onClick={toggleTheme}>
-                {theme === 'dark' ? t('nav.themeLight') : t('nav.themeDark')}
-              </button>
-              <button className={styles.themeToggle} onClick={() => setLang(lang === 'zh' ? 'en' : 'zh')}
-                style={{ marginTop: '4px' }}>
-                {lang === 'zh' ? '🌐 English' : '🌐 中文'}
-              </button>
-            </>
+        <div className={`sf-footer ${styles.sidebarFooter}`}>
+          {/* 导入导出 */}
+          {currentProject && (
+            <button className={`sf-btn ${styles.themeToggle}`} onClick={handleExportCurrent} title={t('nav.exportProject')}>
+              {t('nav.exportProject')}
+            </button>
           )}
+          <button className={`sf-btn ${styles.themeToggle}`} onClick={() => fileInputRef.current?.click()} title={t('nav.importProject')}>
+            {t('nav.importProject')}
+          </button>
+          <input ref={fileInputRef} type="file" accept=".json" style={{ display: 'none' }}
+            onChange={handleImportFile} />
+          {importMsg && (
+            <div style={{
+              fontSize: '11px', color: importMsg.startsWith('✅') ? 'var(--accent)' : 'var(--danger)',
+              marginTop: '4px', textAlign: 'center', wordBreak: 'break-all'
+            }}>
+              {importMsg}
+            </div>
+          )}
+          <div style={{ margin: '4px 0', borderTop: '1px solid var(--border-color)' }} />
+          <button className={`sf-btn ${styles.themeToggle}`} onClick={toggleTheme}>
+            {theme === 'dark' ? t('nav.themeLight') : t('nav.themeDark')}
+          </button>
+          <button className={`sf-btn ${styles.themeToggle}`} onClick={() => setLang(lang === 'zh' ? 'en' : 'zh')}
+            style={{ marginTop: '4px' }}>
+            {t('nav.langSwitch')}
+          </button>
         </div>
       </aside>
 
       {/* 主内容区 */}
-      <div className={styles.mainWrapper}>
+      <div
+        ref={mainRef}
+        className={styles.mainWrapper}
+      >
+        {/* 移动端浮动菜单按钮 */}
+        {isMobileView && (
+          <button
+            onClick={() => setMobileSidebarOpen(true)}
+            aria-label="打开菜单"
+            style={{
+              position: 'fixed',
+              bottom: 20,
+              right: 16,
+              zIndex: 50,
+              width: 48,
+              height: 48,
+              borderRadius: '50%',
+              cursor: 'pointer',
+              background: 'var(--accent)',
+              border: 'none',
+              color: 'var(--bg-primary)',
+              fontSize: 22,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+            }}
+          >
+            ☰
+          </button>
+        )}
+
         {/* 面包屑导航 */}
         {breadcrumbParts.length > 0 && (
           <div className={styles.breadcrumb}>

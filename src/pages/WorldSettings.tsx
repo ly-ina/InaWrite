@@ -37,6 +37,14 @@ export default function WorldSettingsPage() {
   const { currentProject, refreshKey } = useAppStore();
   const { settings, loading, loadSettings, createSetting, updateSetting, deleteSetting } = useWorldSettingStore();
 
+  // 移动端检测
+  const [isMobileView, setIsMobileView] = useState(() => window.innerWidth <= 768);
+  useEffect(() => {
+    const check = () => setIsMobileView(window.innerWidth <= 768);
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
   // UI 状态
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -369,6 +377,7 @@ export default function WorldSettingsPage() {
         </div>
 
         {/* 右侧详情 */}
+        {!isMobileView && (
         <div className={styles.detailPanel}>
           {!selectedSetting ? (
             <div className="empty-state">
@@ -516,7 +525,140 @@ export default function WorldSettingsPage() {
             </div>
           )}
         </div>
+        )}
       </div>
+      )}
+
+      {/* 移动端全屏设定详情覆盖层 */}
+      {isMobileView && selectedSetting && (
+        <div className={`detail-full-overlay ${styles.mobileOverlay}`}>
+          <div className={`detail-full-panel ${styles.mobileDetailPanel}`}>
+            <div className={`detail-full-nav ${styles.mobileDetailNav}`}>
+              <button className={`detail-full-back ${styles.mobileBackBtn}`} onClick={() => setSelectedId(null)}>
+                ← 返回列表
+              </button>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button className="btn btn-sm" onClick={() => setEditingSetting({ ...selectedSetting })}>编辑</button>
+                <button className="btn btn-danger btn-sm" onClick={() => handleDelete(selectedSetting.id, selectedSetting.name)}>删除</button>
+              </div>
+            </div>
+
+            {editingSetting?.id === selectedSetting.id ? (
+              <div className={`detail-full-body ${styles.mobileDetailBody}`}>
+                <h2>编辑设定</h2>
+                <div className="form-group">
+                  <label>名称</label>
+                  <input className="input" value={editingSetting.name}
+                    onChange={(e) => setEditingSetting({ ...editingSetting, name: e.target.value })} />
+                </div>
+                <div className="form-group">
+                  <label>类型</label>
+                  <select className="select" value={editingSetting.type}
+                    onChange={(e) => setEditingSetting({ ...editingSetting, type: e.target.value as WorldSetting['type'] })}>
+                    {Object.entries(TYPE_NAMES).map(([k, v]) => (
+                      <option key={k} value={k}>{TYPE_ICONS[k]} {v}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>父级设定</label>
+                  <select className="select" value={editingSetting.parentId || ''}
+                    onChange={(e) => setEditingSetting({ ...editingSetting, parentId: e.target.value || undefined })}>
+                    <option value="">无（顶层）</option>
+                    {settings.filter((s) => s.id !== editingSetting.id).map((s) => (
+                      <option key={s.id} value={s.id}>{TYPE_ICONS[s.type]} {s.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>描述</label>
+                  <MarkdownEditor value={editingSetting.description}
+                    onChange={(v) => setEditingSetting({ ...editingSetting, description: v })} rows={6} />
+                </div>
+                <div className="form-actions" style={{ borderTop: 'none', paddingTop: 0 }}>
+                  <button className="btn" onClick={() => setEditingSetting(null)}>取消</button>
+                  <button className="btn btn-primary" onClick={handleUpdate}>保存</button>
+                </div>
+              </div>
+            ) : (
+              <div className={`detail-full-body ${styles.mobileDetailBody}`}>
+                <div className={styles.detailHeader}>
+                  <div>
+                    <div className={styles.settingType}>
+                      {TYPE_ICONS[selectedSetting.type]} {TYPE_NAMES[selectedSetting.type]}
+                    </div>
+                    <h2>{selectedSetting.name}</h2>
+                  </div>
+                </div>
+                {selectedSetting.parentId && (
+                  <div className={styles.parentBreadcrumb}>
+                    <span className={styles.parentLabel}>属于：</span>
+                    <span className={styles.parentLink} onClick={() => setSelectedId(selectedSetting.parentId!)}>
+                      {getSettingName(selectedSetting.parentId)}
+                    </span>
+                  </div>
+                )}
+                {settings.filter((s) => s.parentId === selectedSetting.id).length > 0 && (
+                  <section className={styles.section}>
+                    <h3>子设定</h3>
+                    <div className={styles.childrenList}>
+                      {settings.filter((s) => s.parentId === selectedSetting.id).map((s) => (
+                        <span key={s.id} className={styles.childLink} onClick={() => setSelectedId(s.id)}>
+                          {TYPE_ICONS[s.type]} {s.name}
+                        </span>
+                      ))}
+                    </div>
+                  </section>
+                )}
+                <section className={styles.section}>
+                  <h3>描述</h3>
+                  {selectedSetting.description ? (
+                    <div className={styles.mdContent}>
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{selectedSetting.description}</ReactMarkdown>
+                    </div>
+                  ) : (
+                    <span className={styles.muted}>暂无描述</span>
+                  )}
+                </section>
+                <section className={styles.section}>
+                  <div className={styles.sectionHeader}>
+                    <h3>关联条目</h3>
+                    <button className="btn btn-sm" onClick={() => setEditingRelation(true)}>+ 添加</button>
+                  </div>
+                  {selectedSetting.relations.length === 0 ? (
+                    <span className={styles.muted}>暂无关联</span>
+                  ) : (
+                    <div className={styles.relationList}>
+                      {selectedSetting.relations.map((rel) => (
+                        <div key={rel.targetId} className={styles.relationItem}>
+                          <span className={styles.relType}>{rel.type}</span>
+                          <span className={styles.relTarget} onClick={() => setSelectedId(rel.targetId)}>
+                            {getSettingName(rel.targetId)}
+                          </span>
+                          <button className="btn btn-sm btn-ghost" onClick={() => removeRelation(rel.targetId)}
+                            style={{ marginLeft: 'auto', color: 'var(--danger)', fontSize: '11px' }}>移除</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {editingRelation && (
+                    <div className={styles.inlineForm}>
+                      <select className="select" value={relTarget} onChange={(e) => setRelTarget(e.target.value)}>
+                        <option value="">选择设定</option>
+                        {settings.filter((s) => s.id !== selectedSetting.id).map((s) => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                      </select>
+                      <input className="input" placeholder="关联类型" value={relType} onChange={(e) => setRelType(e.target.value)} />
+                      <button className="btn btn-primary btn-sm" onClick={addRelation}>确定</button>
+                      <button className="btn btn-sm" onClick={() => setEditingRelation(false)}>取消</button>
+                    </div>
+                  )}
+                </section>
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {/* 创建设定模态框 */}
