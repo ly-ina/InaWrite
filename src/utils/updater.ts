@@ -6,8 +6,8 @@
  */
 
 /** 当前版本号（与 build.gradle 中的 versionCode 保持一致） */
-const CURRENT_VERSION_CODE = 5;
-const CURRENT_VERSION_NAME = '1.4';
+const CURRENT_VERSION_CODE = 6;
+const CURRENT_VERSION_NAME = '1.5';
 
 /** GitHub Releases API */
 const GITHUB_API = 'https://api.github.com/repos/ly-ina/InaWrite/releases/latest';

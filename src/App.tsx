@@ -226,29 +226,91 @@ function AppRoutes() {
         />
       )}
 
-      {/* OTA 更新弹窗（三按钮：立即更新 / 稍后 / 不再提醒） */}
+      {/* OTA 更新弹窗 */}
       {updateDialog && updateInfo && (
         <div className="modal-overlay" onClick={() => setUpdateDialog(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <div style={{ textAlign: 'center', fontSize: '32px', marginBottom: '8px' }}>🆕</div>
-            <h3 style={{ textAlign: 'center', marginBottom: '8px' }}>发现新版本</h3>
-            <p style={{ textAlign: 'center', fontSize: '18px', fontWeight: 600, marginBottom: '12px' }}>
-              {updateInfo.version}
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginLeft: '6px' }}>
-                ({updateInfo.fileExt === '.exe' ? 'PC版' : 'Android版'})
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '420px', padding: '28px 24px 20px' }}>
+            {/* 顶部图标 */}
+            <div style={{
+              width: '64px', height: '64px', margin: '0 auto 14px',
+              background: 'linear-gradient(135deg, var(--accent-dim), var(--accent))',
+              borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '28px', boxShadow: '0 4px 16px rgba(201,169,110,0.3)',
+            }}>🚀</div>
+
+            <h3 style={{ textAlign: 'center', marginBottom: '4px', fontFamily: 'var(--font-serif)', fontSize: '18px' }}>
+              发现新版本
+            </h3>
+
+            {/* 版本号 */}
+            <div style={{ textAlign: 'center', marginBottom: '14px' }}>
+              <span style={{ fontSize: '28px', fontWeight: 700, color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>
+                {updateInfo.version}
               </span>
-            </p>
+              <span style={{
+                display: 'inline-block', marginLeft: '8px', padding: '2px 8px', borderRadius: '10px',
+                fontSize: '11px', background: updateInfo.fileExt === '.exe' ? 'rgba(107,140,201,0.15)' : 'rgba(90,158,111,0.15)',
+                color: updateInfo.fileExt === '.exe' ? '#6b8cc9' : '#5a9e6f',
+                verticalAlign: 'super',
+              }}>
+                {updateInfo.fileExt === '.exe' ? '🖥️ PC' : '📱 Android'}
+              </span>
+            </div>
+
+            {/* 更新日志 */}
             {updateInfo.changelog && (
-              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', marginBottom: '14px', maxHeight: '120px', overflow: 'auto' }}>
-                {updateInfo.changelog}
-              </p>
+              <div style={{
+                background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)',
+                padding: '12px 14px', marginBottom: '16px', maxHeight: '130px', overflow: 'auto',
+                border: '1px solid var(--border-color)',
+              }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', fontWeight: 600 }}>
+                  📋 更新内容
+                </div>
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
+                  {updateInfo.changelog}
+                </div>
+              </div>
             )}
+
+            {/* 下载进度条 */}
+            {isDownloading && (
+              <div style={{ marginBottom: '14px' }}>
+                <div style={{
+                  width: '100%', height: '6px', background: 'var(--bg-secondary)',
+                  borderRadius: '3px', overflow: 'hidden',
+                }}>
+                  <div style={{
+                    width: `${updateProgress}%`, height: '100%',
+                    background: 'linear-gradient(90deg, var(--accent), #e0c87a)',
+                    borderRadius: '3px', transition: 'width 0.3s',
+                  }} />
+                </div>
+                <div style={{ textAlign: 'center', fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                  下载中 {updateProgress}%
+                </div>
+              </div>
+            )}
+
+            {/* 按钮 */}
             <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-              <button className="btn" onClick={skipUpdate} style={{ fontSize: '12px' }}>不再提醒</button>
-              <button className="btn" onClick={() => setUpdateDialog(false)} style={{ fontSize: '12px' }}>稍后</button>
-              <button className="btn btn-primary" onClick={handleDownloadUpdate} disabled={isDownloading}
-                style={{ fontSize: '12px' }}>
-                {isDownloading ? `下载中 ${updateProgress}%` : '立即更新'}
+              <button className="btn" onClick={skipUpdate} style={{ fontSize: '13px', padding: '8px 16px', color: 'var(--text-muted)' }}>
+                不再提醒
+              </button>
+              <button className="btn" onClick={() => setUpdateDialog(false)} style={{ fontSize: '13px', padding: '8px 20px' }}>
+                稍后
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={handleDownloadUpdate}
+                disabled={isDownloading}
+                style={{
+                  fontSize: '13px', padding: '8px 24px', fontWeight: 600,
+                  background: 'linear-gradient(135deg, var(--accent), #b8943a)',
+                  border: 'none',
+                }}
+              >
+                {isDownloading ? '下载中...' : '⚡ 立即更新'}
               </button>
             </div>
           </div>
