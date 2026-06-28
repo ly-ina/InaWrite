@@ -34,7 +34,16 @@ jobs:
         run: echo "$KEYSTORE_BASE64" | base64 -d > android/app/inakb-release.keystore
 
       - name: Switch gradle to online download
-        run: sed -i 's|file:/E:/Gradle/gradle-8.14.3-all.zip|https://services.gradle.org/distributions/gradle-8.14.3-all.zip|' android/gradle/wrapper/gradle-wrapper.properties
+        run: |
+          cat > android/gradle/wrapper/gradle-wrapper.properties << 'EOF'
+          distributionBase=GRADLE_USER_HOME
+          distributionPath=wrapper/dists
+          distributionUrl=https\://services.gradle.org/distributions/gradle-8.14.3-all.zip
+          networkTimeout=180000
+          validateDistributionUrl=false
+          zipStoreBase=GRADLE_USER_HOME
+          zipStorePath=wrapper/dists
+          EOF
 
       - name: Build frontend
         run: npx vite build
