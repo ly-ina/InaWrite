@@ -92,30 +92,21 @@ export async function checkForUpdate(): Promise<ReleaseInfo | null> {
       return null; // 没有新版本
     }
 
-    // 根据平台找对应的产物
-    const assets: { name: string; browser_download_url: string; size: number }[] = data.assets || [];
-
-    let downloadUrl: string;
-    let fileExt: string;
-
-    if (platform === 'android') {
-      const asset = assets.find((a: any) => a.name?.endsWith('.apk'));
-      if (!asset) { console.log('[OTA] 未找到 Android APK 产物'); return null; }
-      downloadUrl = asset.browser_download_url;
-      fileExt = '.apk';
-    } else {
-      // PC 端：不下载大文件，直接打开 Release 页面让用户手动下载
-      downloadUrl = data.html_url || `https://github.com/ly-ina/InaWrite/releases/tag/${data.tag_name}`;
-      fileExt = '.exe';
-    }
+    // Android 端：用 APK 直链（原生 HttpURLConnection 下载）
+    // PC 端：用 Release 页面 URL（浏览器打开）
+    const assets: { name: string; browser_download_url: string }[] = data.assets || [];
+    const apkAsset = assets.find((a: any) => a.name?.endsWith('.apk'));
+    const downloadUrl = platform === 'android' && apkAsset
+      ? apkAsset.browser_download_url
+      : (data.html_url || `https://github.com/ly-ina/InaWrite/releases/tag/${data.tag_name}`);
 
     return {
       version: data.tag_name || data.name || `v${releaseVersionCode}`,
       versionCode: releaseVersionCode,
       downloadUrl,
-      fileSize: platform === 'android' ? (assets.find((a: any) => a.name?.endsWith('.apk'))?.size || 0) : 0,
+      fileSize: apkAsset?.size || 0,
       changelog: body.slice(0, 500),
-      fileExt,
+      fileExt: platform === 'android' ? '.apk' : '.exe',
     };
   } catch {
     return null;
@@ -201,22 +192,35 @@ export async function downloadUpdate(
   }
 
   // Android：直接使用 XMLHttpRequest（WebView 中比 fetch 更可靠）
-  // fetch 在 WebView 中对大文件流式读取和 302 重定向支持不好
   const merged = await downloadWithXHR(url, onProgress);
 
-  // Android: 写入 Cache 目录，用原生安装器打开
-  const { Filesystem, Directory } = await import('@capacitor/filesystem');
-  let binary = '';
-  for (let i = 0; i < merged.length; i++) {
-    binary += String.fromCharCode(merged[i]);
-  }
-  const base64 = btoa(binary);
+  console.log(`[OTA] 下载完成, 大小: ${merged.length} bytes`);
 
-  const result = await Filesystem.writeFile({
-    path: filename,
-    data: base64,
-    directory: Directory.Cache,
-  });
+  // 写入 Cache 目录，用原生安装器打开
+  const { Filesystem, Directory } = await import('@capacitor/filesystem');
+
+  // Uint8Array → base64（必须整体编码，不能分块 btoa 再拼接）
+  let base64: string;
+  try {
+    base64 = uint8ArrayToBase64(merged);
+    console.log(`[OTA] base64 编码完成, 长度: ${base64.length}`);
+  } catch (e: any) {
+    console.error('[OTA] base64 编码失败:', e);
+    throw new Error(`编码失败: ${e.message}`);
+  }
+
+  let result: any;
+  try {
+    result = await Filesystem.writeFile({
+      path: filename,
+      data: base64,
+      directory: Directory.Cache,
+    });
+    console.log(`[OTA] 文件写入成功: ${result.uri}`);
+  } catch (e: any) {
+    console.error('[OTA] 文件写入失败:', e);
+    throw new Error(`写入失败: ${e.message}`);
+  }
 
   return { uri: result.uri, platform: 'android' };
 }
@@ -294,6 +298,29 @@ function tryXHR(
 
     xhr.send();
   });
+}
+
+/** Uint8Array → Base64（正确方式：整体编码，不分块） */
+function uint8ArrayToBase64(bytes: Uint8Array): string {
+  // 用 apply 技巧将 Uint8Array 一次性转为字符串，再 btoa
+  // 对大文件（>2MB）分大块处理避免调用栈溢出
+  const CHUNK = 65536; // 64KB 块
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    const end = Math.min(i + CHUNK, bytes.length);
+    binary += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, end)));
+  }
+  return btoa(binary);
+}
+
+/** Android: 调用原生下载 + 安装 APK（完全绕过 WebView 网络限制） */
+export function nativeDownloadAndInstall(url: string): boolean {
+  const bridge = (window as any).AndroidUpdateInstaller;
+  if (bridge && bridge.downloadAndInstall) {
+    bridge.downloadAndInstall(url);
+    return true;
+  }
+  return false;
 }
 
 /** Android: 调用原生安装器安装 APK */

@@ -25,7 +25,7 @@ import AboutPage from './pages/About';
 import { electronBridge } from './utils/electronBridge';
 import { useAppStore } from './store/appStore';
 import { db } from './db/database';
-import { checkForUpdate, downloadUpdate, installApk, getCurrentVersion } from './utils/updater';
+import { checkForUpdate, downloadUpdate, nativeDownloadAndInstall, getCurrentVersion } from './utils/updater';
 import './styles/global.css';
 
 export default function App() {
@@ -94,30 +94,38 @@ function AppRoutes() {
   // 下载并安装更新
   const handleDownloadUpdate = async () => {
     if (!updateInfo) return;
-    // PC 端：直接打开 GitHub Release 页面（exe 太大不适合 OTA 下载）
+    // PC 端：直接打开 GitHub Release 页面
     if (updateInfo.fileExt === '.exe') {
       window.open(updateInfo.downloadUrl, '_blank');
       setUpdateDialog(false);
-      setUpdateStatus('已在浏览器中打开下载页面，请手动下载最新版本');
+      setUpdateStatus('已在浏览器中打开下载页面');
       return;
     }
-    // Android 端：OTA 下载 APK
-    setIsDownloading(true);
-    setUpdateProgress(0);
-    setUpdateStatus('正在下载更新...');
-    try {
-      const filename = `InaKB-${updateInfo.version}.apk`;
-      const result = await downloadUpdate(updateInfo.downloadUrl, filename, (pct) => {
-        setUpdateProgress(pct);
-        setUpdateStatus(`下载中 ${pct}%`);
-      });
-      setUpdateDialog(false);
+    // Android 端：原生 HttpURLConnection 下载（走系统代理，比 WebView 可靠）
+
+    (window as any).__inakbDownloadProgress = (pct: number) => {
+      setUpdateProgress(pct);
+      setUpdateStatus(`下载中 ${pct}%`);
+    };
+    (window as any).__inakbDownloadDone = () => {
+      setUpdateProgress(100);
       setUpdateStatus('下载完成，准备安装...');
-      setTimeout(() => installApk(result.uri), 500);
-    } catch (err: any) {
-      setUpdateStatus(`下载失败: ${err.message}`);
+    };
+    (window as any).__inakbDownloadError = (err: string) => {
+      setUpdateStatus(`下载失败: ${err}`);
       setIsDownloading(false);
+    };
+    if (nativeDownloadAndInstall(downloadUrl)) {
+      setIsDownloading(true);
+      setUpdateDialog(false);
+      setUpdateProgress(0);
+      setUpdateStatus('正在连接...');
+      return;
     }
+    // 回退：打开浏览器
+    window.open(updateInfo.downloadUrl, '_blank');
+    setUpdateDialog(false);
+    setUpdateStatus('已在浏览器中打开下载页面');
   };
 
   // 暴露给 About 页面调用

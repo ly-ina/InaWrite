@@ -3,27 +3,100 @@ package com.inakb.novel;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
+import android.os.Environment;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebView;
 import androidx.core.content.FileProvider;
 import com.getcapacitor.BridgeActivity;
+import com.getcapacitor.JSObject;
+import com.getcapacitor.PluginCall;
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 
 public class MainActivity extends BridgeActivity {
 
     @Override
     public void onStart() {
         super.onStart();
-        // 注册 JavaScript Interface 到 WebView
         WebView webView = getBridge().getWebView();
         webView.addJavascriptInterface(new UpdateInstaller(), "AndroidUpdateInstaller");
     }
 
-    /**
-     * 提供给前端调用的 APK 安装接口
-     * 使用 FileProvider 分享 APK URI，触发系统安装器覆盖安装
-     */
     public class UpdateInstaller {
+        /**
+         * 原生下载 APK 并安装（绕过 WebView 的网络限制）
+         * 前端调用: AndroidUpdateInstaller.downloadAndInstall(url)
+         * 回调: window.__inakbDownloadProgress(pct) 和 window.__inakbDownloadDone()
+         */
+        @JavascriptInterface
+        public void downloadAndInstall(final String downloadUrl) {
+            new Thread(() -> {
+                try {
+                    android.util.Log.i("InaKBUpdate", "Downloading: " + downloadUrl);
+                    URL url = new URL(downloadUrl);
+                    HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                    conn.setInstanceFollowRedirects(true);
+                    conn.setRequestProperty("User-Agent", "InaKB");
+                    conn.setConnectTimeout(30000);
+                    conn.setReadTimeout(120000);
+                    conn.connect();
+
+                    if (conn.getResponseCode() != HttpURLConnection.HTTP_OK) {
+                        android.util.Log.e("InaKBUpdate", "HTTP " + conn.getResponseCode());
+                        evalJS("window.__inakbDownloadError&&window.__inakbDownloadError('HTTP " + conn.getResponseCode() + "')");
+                        return;
+                    }
+
+                    int total = conn.getContentLength();
+                    File dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+                    if (!dir.exists()) dir.mkdirs();
+                    File apkFile = new File(dir, "InaKB-update.apk");
+
+                    InputStream in = conn.getInputStream();
+                    FileOutputStream out = new FileOutputStream(apkFile);
+                    byte[] buf = new byte[8192];
+                    int len, downloaded = 0;
+                    int lastPct = 0;
+                    while ((len = in.read(buf)) > 0) {
+                        out.write(buf, 0, len);
+                        downloaded += len;
+                        if (total > 0) {
+                            int pct = downloaded * 100 / total;
+                            if (pct > lastPct) {
+                                lastPct = pct;
+                                final int fpct = pct;
+                                runOnUiThread(() -> evalJS("window.__inakbDownloadProgress&&window.__inakbDownloadProgress(" + fpct + ")"));
+                            }
+                        }
+                    }
+                    out.close();
+                    in.close();
+                    conn.disconnect();
+
+                    android.util.Log.i("InaKBUpdate", "Downloaded: " + apkFile.getAbsolutePath());
+
+                    runOnUiThread(() -> {
+                        evalJS("window.__inakbDownloadDone&&window.__inakbDownloadDone()");
+                        installApk(apkFile.getAbsolutePath());
+                    });
+                } catch (Exception e) {
+                    android.util.Log.e("InaKBUpdate", "Download failed", e);
+                    final String err = e.getMessage();
+                    runOnUiThread(() -> evalJS("window.__inakbDownloadError&&window.__inakbDownloadError('" + err + "')"));
+                }
+            }).start();
+        }
+
+        private void evalJS(String js) {
+            WebView wv = getBridge().getWebView();
+            if (wv != null) {
+                wv.post(() -> wv.evaluateJavascript(js, null));
+            }
+        }
+
         @JavascriptInterface
         public void installApk(String filePath) {
             try {
@@ -35,7 +108,6 @@ public class MainActivity extends BridgeActivity {
 
                 Uri apkUri;
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                    // Android 7.0+ 使用 FileProvider
                     apkUri = FileProvider.getUriForFile(
                         MainActivity.this,
                         getApplicationContext().getPackageName() + ".fileprovider",
