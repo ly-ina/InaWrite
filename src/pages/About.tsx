@@ -11,14 +11,18 @@ import styles from './About.module.css';
 export default function AboutPage() {
   const { t } = useT();
   const [checking, setChecking] = useState(false);
+  const [checkDone, setCheckDone] = useState(false);
 
   const handleCheckUpdate = async () => {
     setChecking(true);
+    setCheckDone(false);
     try {
       const fn = (window as any).__inakbCheckUpdate;
       if (fn) await fn();
     } finally {
       setChecking(false);
+      setCheckDone(true);
+      setTimeout(() => setCheckDone(false), 2500);
     }
   };
 
@@ -41,9 +45,13 @@ export default function AboutPage() {
             className="btn btn-primary"
             onClick={handleCheckUpdate}
             disabled={checking}
-            style={{ marginTop: '10px' }}
+            style={{
+              marginTop: '10px',
+              transition: 'all 0.3s',
+              ...(checkDone ? { background: 'var(--success)', borderColor: 'var(--success)' } : {}),
+            }}
           >
-            {checking ? '⏳ 检测中...' : '🔍 检查更新'}
+            {checking ? '⏳ 检测中...' : checkDone ? '✅ 检测完成' : '🔍 检查更新'}
           </button>
         </div>
 

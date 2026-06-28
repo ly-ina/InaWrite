@@ -46,13 +46,20 @@ function AppRoutes() {
   const [updateProgress, setUpdateProgress] = useState(0);
   const [isDownloading, setIsDownloading] = useState(false);
   const [updateStatus, setUpdateStatus] = useState('');
+  const [toastMessage, setToastMessage] = useState(''); // 通用通知弹窗
+
+  // 显示通知弹窗（替代 alert）
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(''), 3000);
+  };
 
   // OTA 更新检测
   const doUpdateCheck = useCallback(async (silent = false) => {
     const isNative = !!(window as any).Capacitor?.isNativePlatform?.();
     const isElectron = !!(window as any).electronAPI;
     if (!isNative && !isElectron) {
-      if (!silent) alert('当前为浏览器环境，无法检测更新');
+      if (!silent) showToast('当前为浏览器环境，无法检测更新');
       return 'web';
     }
 
@@ -60,7 +67,7 @@ function AppRoutes() {
     const skippedVersion = localStorage.getItem('inakb_skip_update');
     const info = await checkForUpdate();
     if (!info) {
-      if (!silent) alert('已是最新版本');
+      if (!silent) showToast('已是最新版本 ✨');
       return null;
     }
     if (info.versionCode.toString() === skippedVersion && silent) return null;
@@ -87,22 +94,26 @@ function AppRoutes() {
   // 下载并安装更新
   const handleDownloadUpdate = async () => {
     if (!updateInfo) return;
+    // PC 端：直接打开 GitHub Release 页面（exe 太大不适合 OTA 下载）
+    if (updateInfo.fileExt === '.exe') {
+      window.open(updateInfo.downloadUrl, '_blank');
+      setUpdateDialog(false);
+      setUpdateStatus('已在浏览器中打开下载页面，请手动下载最新版本');
+      return;
+    }
+    // Android 端：OTA 下载 APK
     setIsDownloading(true);
     setUpdateProgress(0);
     setUpdateStatus('正在下载更新...');
     try {
-      const filename = `InaKB-${updateInfo.version}${updateInfo.fileExt || '.apk'}`;
+      const filename = `InaKB-${updateInfo.version}.apk`;
       const result = await downloadUpdate(updateInfo.downloadUrl, filename, (pct) => {
         setUpdateProgress(pct);
         setUpdateStatus(`下载中 ${pct}%`);
       });
       setUpdateDialog(false);
-      if (result.platform === 'android') {
-        setUpdateStatus('下载完成，准备安装...');
-        setTimeout(() => installApk(result.uri), 500);
-      } else {
-        setUpdateStatus('下载完成！请关闭应用后用新版本 exe 替换旧版');
-      }
+      setUpdateStatus('下载完成，准备安装...');
+      setTimeout(() => installApk(result.uri), 500);
     } catch (err: any) {
       setUpdateStatus(`下载失败: ${err.message}`);
       setIsDownloading(false);
@@ -317,39 +328,32 @@ function AppRoutes() {
         </div>
       )}
 
-      {/* 更新状态提示 */}
+      {/* 更新状态提示（下载中/完成/错误） */}
       {updateStatus && (
-        <div style={{
-          position: 'fixed',
-          bottom: '80px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          background: 'var(--surface)',
-          border: '1px solid var(--border-color)',
-          borderRadius: '8px',
-          padding: '10px 20px',
-          zIndex: 9999,
-          boxShadow: '0 2px 12px rgba(0,0,0,0.3)',
-          fontSize: '14px',
-        }}>
-          {updateStatus}
-          {isDownloading && (
-            <div style={{
-              width: '100%',
-              height: '4px',
-              background: 'var(--border-color)',
-              borderRadius: '2px',
-              marginTop: '6px',
-            }}>
-              <div style={{
-                width: `${updateProgress}%`,
-                height: '100%',
-                background: 'var(--primary)',
-                borderRadius: '2px',
-                transition: 'width 0.3s',
-              }} />
-            </div>
-          )}
+        <div className="toast-container">
+          <div className="toast-card">
+            <span className="toast-icon">{isDownloading ? '⏳' : updateStatus.includes('失败') ? '❌' : '✅'}</span>
+            <span className="toast-text">{updateStatus}</span>
+            {isDownloading && (
+              <div className="toast-progress">
+                <div className="toast-progress-fill" style={{ width: `${updateProgress}%` }} />
+              </div>
+            )}
+            {!isDownloading && (
+              <button className="toast-close" onClick={() => setUpdateStatus('')}>×</button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 通用通知弹窗（替代 alert） */}
+      {toastMessage && (
+        <div className="toast-container">
+          <div className="toast-card" onClick={() => setToastMessage('')}>
+            <span className="toast-icon">💬</span>
+            <span className="toast-text">{toastMessage}</span>
+            <button className="toast-close" onClick={(e) => { e.stopPropagation(); setToastMessage(''); }}>×</button>
+          </div>
         </div>
       )}
     </>

@@ -44,4 +44,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('theme-changed', handler);
     return () => ipcRenderer.removeListener('theme-changed', handler);
   },
+
+  // ========== OTA 更新（主进程网络请求，绕过 file:// CORS）==========
+  otaCheckUpdate: () => ipcRenderer.invoke('ota:checkUpdate'),
+  otaDownload: (url: string, savePath: string) => ipcRenderer.invoke('ota:download', url, savePath),
 });

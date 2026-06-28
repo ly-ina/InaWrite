@@ -6,6 +6,8 @@
 import { app, BrowserWindow, Tray, Menu, ipcMain, dialog, nativeTheme } from 'electron';
 import path from 'path';
 import fs from 'fs';
+import https from 'https';
+import http from 'http';
 
 // ========== 常量 ==========
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
@@ -261,6 +263,26 @@ function setupIPC() {
     return getLatestAutosave();
   });
 
+  // OTA 更新：从 GitHub API 检测新版本（主进程发请求，不受 CORS 限制）
+  ipcMain.handle('ota:checkUpdate', async () => {
+    try {
+      const data = await httpGet('https://api.github.com/repos/ly-ina/InaWrite/releases/latest');
+      return { success: true, data };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  // OTA 更新：下载文件（主进程下载，绕过 file:// CORS）
+  ipcMain.handle('ota:download', async (_event, url: string, savePath: string) => {
+    try {
+      await downloadFile(url, savePath);
+      return { success: true, path: savePath };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  });
+
   // 应用信息
   ipcMain.handle('app:info', () => {
     return {
@@ -364,3 +386,74 @@ app.on('before-quit', () => {
     tray = null;
   }
 });
+
+// ========== OTA 网络请求辅助函数（Node.js 原生，不受 CORS 限制）==========
+
+/** HTTP GET 请求，返回 JSON（自动检测系统代理） */
+function httpGet(url: string): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const mod = url.startsWith('https') ? https : http;
+
+    // 检测系统 HTTP 代理环境变量
+    const proxy = process.env.HTTP_PROXY || process.env.http_proxy;
+    const proxyUrl = url.startsWith('https')
+      ? (process.env.HTTPS_PROXY || process.env.https_proxy || proxy)
+      : proxy;
+
+    console.log('[OTA] 请求:', url, proxyUrl ? `(代理: ${proxyUrl})` : '(直连)');
+
+    const options: any = {};
+    if (proxyUrl) {
+      try {
+        const u = new URL(proxyUrl);
+        options.host = u.hostname;
+        options.port = u.port || 3128;
+        options.path = url;
+        options.headers = { Host: new URL(url).host, 'User-Agent': 'Novel-InaKB' };
+      } catch { /* 代理 URL 解析失败，直连 */ }
+    }
+
+    const req = proxyUrl ? mod.request(options) : mod.get(url, { headers: { 'User-Agent': 'Novel-InaKB' } });
+
+    req.on('response', (res: any) => {
+      if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        httpGet(res.headers.location).then(resolve).catch(reject);
+        return;
+      }
+      let body = '';
+      res.on('data', (chunk: string) => { body += chunk; });
+      res.on('end', () => {
+        try {
+          resolve(JSON.parse(body));
+        } catch {
+          resolve(body);
+        }
+      });
+    });
+
+    req.on('error', reject);
+    if (proxyUrl) req.end();
+  });
+}
+
+/** 下载文件到指定路径（支持重定向 + 镜像回退） */
+function downloadFile(url: string, savePath: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const mod = url.startsWith('https') ? https : http;
+    mod.get(url, { headers: { 'User-Agent': 'Novel-InaKB' } }, (res) => {
+      // 跟随重定向
+      if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        downloadFile(res.headers.location, savePath).then(resolve).catch(reject);
+        return;
+      }
+      if (res.statusCode !== 200) {
+        reject(new Error(`下载失败: HTTP ${res.statusCode}`));
+        return;
+      }
+      const file = fs.createWriteStream(savePath);
+      res.pipe(file);
+      file.on('finish', () => { file.close(); resolve(); });
+      file.on('error', reject);
+    }).on('error', reject);
+  });
+}
