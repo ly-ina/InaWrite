@@ -95,8 +95,11 @@ def build_pc():
     # vite build + electron tsc + rename
     for cmd in ['npx vite build', 'npx tsc -p electron/tsconfig.json', 'node scripts/rename-electron.cjs']:
         subprocess.run(cmd, cwd=ROOT, check=True, shell=True)
-    # electron-builder (may return exit code 1 for warnings, check file instead)
-    result = subprocess.run('npx electron-builder --win --dir', cwd=ROOT, shell=True)
+    # electron-builder: 关代理避免下载卡住，用国内镜像加速
+    result = subprocess.run(
+        'set http_proxy= && set https_proxy= && set ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ && set ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/ && npx electron-builder --win --dir',
+        cwd=ROOT, shell=True
+    )
     if os.path.exists(EXE_PATH):
         hashes = load_hashes()
         hashes['pc'] = get_src_hash()

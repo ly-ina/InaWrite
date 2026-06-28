@@ -39,7 +39,7 @@ def bump_version():
         f.write(gradle)
     print(f'build.gradle: versionCode {old_code} → {new_code}')
 
-    # 2. 更新 src/utils/updater.ts 中的 CURRENT_VERSION_CODE
+    # 2. 更新 src/utils/updater.ts 中的 CURRENT_VERSION_CODE 和 CURRENT_VERSION_NAME
     updater_path = os.path.join(ROOT, 'src', 'utils', 'updater.ts')
     with open(updater_path, 'r', encoding='utf-8') as f:
         updater = f.read()
@@ -49,6 +49,16 @@ def bump_version():
         f'const CURRENT_VERSION_CODE = {new_code};',
         updater
     )
+
+    # 同步 versionName（从 build.gradle 获取新版本号）
+    if vn_match:
+        new_vn_str = f'{major}.{minor + 1}'
+        updater = re.sub(
+            r"const CURRENT_VERSION_NAME = '[^']+';",
+            f"const CURRENT_VERSION_NAME = '{new_vn_str}';",
+            updater
+        )
+        print(f'updater.ts: CURRENT_VERSION_NAME → {new_vn_str}')
 
     with open(updater_path, 'w', encoding='utf-8') as f:
         f.write(updater)
