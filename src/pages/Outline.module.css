@@ -391,8 +391,9 @@
 
   .treeArea {
     flex: none;
-    max-height: 45vh;
+    max-height: none;
     overflow-y: auto;
+    flex: 1;
   }
 
   .sidePanel {
@@ -402,17 +403,34 @@
     border-top: 2px solid var(--border-color);
     padding-left: 0;
     padding-top: 10px;
-    max-height: 45vh;
-    overflow-y: auto;
+    max-height: none;
+    overflow-y: visible;
   }
 
   .node {
-    padding: 6px 10px;
-    gap: 6px;
+    padding: 10px 12px;
+    gap: 8px;
   }
 
   .nodeTitle {
-    font-size: 13px;
+    font-size: 14px;
+    white-space: normal;
+    line-height: 1.4;
+  }
+
+  .badges {
+    display: none;
+  }
+
+  .nodeActions {
+    opacity: 1 !important;
+    gap: 4px;
+  }
+
+  .actionBtn {
+    width: 28px;
+    height: 28px;
+    font-size: 14px;
   }
 
   .editPanel {
@@ -446,4 +464,53 @@
   .detailNotes {
     font-size: 12px;
   }
+}
+
+/* ========== 移动端全屏覆盖层 ========== */
+.mobileOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 200;
+  background: var(--bg-primary);
+  display: flex;
+  flex-direction: column;
+}
+
+.mobileDetailPanel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.mobileDetailNav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 14px 10px 14px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-card);
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+.mobileBackBtn {
+  padding: 6px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  font-size: 14px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.mobileDetailBody {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+  -webkit-overflow-scrolling: touch;
 }

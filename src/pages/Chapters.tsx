@@ -24,6 +24,14 @@ function countChineseWords(text: string): number {
 
 export default function ChaptersPage() {
   const { currentProject, refreshKey } = useAppStore();
+
+  // 移动端检测
+  const [isMobileView, setIsMobileView] = useState(() => window.innerWidth <= 768);
+  useEffect(() => {
+    const check = () => setIsMobileView(window.innerWidth <= 768);
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
   const { chapters, loading, loadChapters, createChapter, updateChapter, deleteChapter } = useChapterStore();
   const { characters, loadCharacters } = useCharacterStore();
   const { foreshadows, loadForeshadows } = useForeshadowStore();
@@ -251,6 +259,7 @@ export default function ChaptersPage() {
         </div>
 
         {/* 右侧详情 */}
+        {!isMobileView && (
         <div className={styles.detailPanel}>
           {!selectedChapter ? (
             <div className="empty-state">
@@ -489,7 +498,168 @@ export default function ChaptersPage() {
             </div>
           )}
         </div>
+        )}
       </div>
+
+      {/* 移动端全屏章节详情覆盖层 */}
+      {isMobileView && selectedChapter && (
+        <div className={`detail-full-overlay ${styles.mobileOverlay}`}>
+          <div className={`detail-full-panel ${styles.mobileDetailPanel}`}>
+            <div className={`detail-full-nav ${styles.mobileDetailNav}`}>
+              <button className={`detail-full-back ${styles.mobileBackBtn}`} onClick={() => setSelectedId(null)}>
+                ← 返回列表
+              </button>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button className="btn btn-sm" onClick={() => openDraft(selectedChapter)}>✍️ 草稿</button>
+                <button className="btn btn-sm" onClick={() => setEditingChapter({ ...selectedChapter })}>编辑</button>
+                <button className="btn btn-danger btn-sm" onClick={() => handleDelete(selectedChapter.id, selectedChapter.title)}>删除</button>
+              </div>
+            </div>
+
+            {editingChapter?.id === selectedChapter.id ? (
+              <div className={`detail-full-body ${styles.mobileDetailBody}`}>
+                <h2>编辑章节</h2>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                  <div className="form-group">
+                    <label>序号</label>
+                    <input className="input" type="number" value={editingChapter.number}
+                      onChange={(e) => setEditingChapter({ ...editingChapter, number: parseInt(e.target.value) || 0 })} />
+                  </div>
+                  <div className="form-group">
+                    <label>字数</label>
+                    <input className="input" type="number" value={editingChapter.wordCount || ''}
+                      onChange={(e) => setEditingChapter({ ...editingChapter, wordCount: parseInt(e.target.value) || undefined })} />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label>标题</label>
+                  <input className="input" value={editingChapter.title}
+                    onChange={(e) => setEditingChapter({ ...editingChapter, title: e.target.value })} />
+                </div>
+                <div className="form-group">
+                  <label>状态</label>
+                  <select className="select" value={editingChapter.status}
+                    onChange={(e) => setEditingChapter({ ...editingChapter, status: e.target.value as Chapter['status'] })}>
+                    <option value="draft">草稿</option>
+                    <option value="revising">修订中</option>
+                    <option value="done">已完成</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>正文（Markdown）</label>
+                  <MarkdownEditor
+                    value={editingChapter.content || ''}
+                    onChange={(v) => setEditingChapter({ ...editingChapter, content: v, wordCount: countChineseWords(v) || editingChapter.wordCount })}
+                    rows={12}
+                    label={`字数：${countChineseWords(editingChapter.content || '').toLocaleString()}`}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>摘要</label>
+                  <textarea className="textarea" value={editingChapter.summary || ''}
+                    onChange={(e) => setEditingChapter({ ...editingChapter, summary: e.target.value })} rows={4} />
+                </div>
+                <div className="form-actions" style={{ borderTop: 'none', paddingTop: 0 }}>
+                  <button className="btn" onClick={() => setEditingChapter(null)}>取消</button>
+                  <button className="btn btn-primary" onClick={handleUpdate}>保存</button>
+                </div>
+              </div>
+            ) : (
+              <div className={`detail-full-body ${styles.mobileDetailBody}`}>
+                <div className={styles.detailHeader}>
+                  <div>
+                    <div className={styles.chapterBadge}>第{selectedChapter.number}章</div>
+                    <h2>{selectedChapter.title}</h2>
+                    <div className={styles.detailMeta}>
+                      <span>{countChineseWords(selectedChapter.content || '').toLocaleString()} 字</span>
+                      <span className={`tag tag-${selectedChapter.status}`}>{STATUS_LABELS[selectedChapter.status]}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {selectedChapter.content ? (
+                  <section className={styles.section}>
+                    <h3>正文</h3>
+                    <div className={styles.contentPreview}>
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{selectedChapter.content}</ReactMarkdown>
+                    </div>
+                  </section>
+                ) : (
+                  <section className={styles.section}>
+                    <div className={styles.emptyContent}>📝 暂无正文，点击「✍️ 草稿」开始写作</div>
+                  </section>
+                )}
+
+                {selectedChapter.summary && (
+                  <section className={styles.section}>
+                    <h3>内容摘要</h3>
+                    <p className={styles.summary}>{selectedChapter.summary}</p>
+                  </section>
+                )}
+
+                {selectedChapter.keyEvents.length > 0 && (
+                  <section className={styles.section}>
+                    <h3>关键事件</h3>
+                    <ul className={styles.eventList}>
+                      {selectedChapter.keyEvents.map((e, i) => (
+                        <li key={i}>{e}</li>
+                      ))}
+                    </ul>
+                  </section>
+                )}
+
+                {selectedChapter.characters.length > 0 && (
+                  <section className={styles.section}>
+                    <h3>出场角色</h3>
+                    <div className={styles.tagList}>
+                      {selectedChapter.characters.map((id) => {
+                        const name = getCharName(id);
+                        return (
+                          <span key={id} className={styles.relatedTag} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                            {name || '未知'}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </section>
+                )}
+
+                {selectedChapter.foreshadowsAdded.length > 0 && (
+                  <section className={styles.section}>
+                    <h3>新增伏笔</h3>
+                    <div className={styles.tagList}>
+                      {selectedChapter.foreshadowsAdded.map((id) => {
+                        const content = getForeshadowContent(id);
+                        return (
+                          <span key={id} className={styles.relatedTag} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(201, 158, 75, 0.15)', color: 'var(--warning)' }}>
+                            {content || '未知伏笔'}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </section>
+                )}
+
+                {selectedChapter.foreshadowsResolved.length > 0 && (
+                  <section className={styles.section}>
+                    <h3>回收伏笔</h3>
+                    <div className={styles.tagList}>
+                      {selectedChapter.foreshadowsResolved.map((id) => {
+                        const content = getForeshadowContent(id);
+                        return (
+                          <span key={id} className={styles.relatedTag} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(90, 158, 111, 0.15)', color: 'var(--success)' }}>
+                            {content || '未知伏笔'}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </section>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* 创建章节模态框 */}
       {showCreate && (

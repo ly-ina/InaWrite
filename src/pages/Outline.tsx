@@ -28,6 +28,14 @@ const ORDER_STEP = 1000;
 
 export default function OutlinePage() {
   const { currentProject, triggerRefresh } = useAppStore();
+
+  // 移动端检测
+  const [isMobileView, setIsMobileView] = useState(() => window.innerWidth <= 768);
+  useEffect(() => {
+    const check = () => setIsMobileView(window.innerWidth <= 768);
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
   const { nodes, loading, loadNodes, createNode, updateNode, deleteNode, reorderNodes, generateFromChapters } = useOutlineStore();
   const { characters, loadCharacters } = useCharacterStore();
   const { foreshadows, loadForeshadows } = useForeshadowStore();
@@ -657,6 +665,128 @@ export default function OutlinePage() {
     );
   };
 
+  /** 内联编辑表单（用于移动端覆盖层，无外层 panel 包裹） */
+  const renderEditFormInline = () => (
+    <>
+      <h3>{editingId ? '编辑节点' : '新增节点'}</h3>
+      <div className="form-group">
+        <label>标题</label>
+        <input className="input" value={editTitle} onChange={(e) => setEditTitle(e.target.value)}
+          placeholder="节点标题" autoFocus />
+      </div>
+      <div className="form-group">
+        <label>类型</label>
+        <select className="select" value={editType} onChange={(e) => setEditType(e.target.value as OutlineNodeType)}>
+          <option value="volume">📚 卷</option>
+          <option value="chapter">📖 章</option>
+          <option value="section">📄 节</option>
+          <option value="scene">🎬 场景</option>
+        </select>
+      </div>
+      <div className="form-group">
+        <label>父节点</label>
+        <select className="select" value={editParentId || ''} onChange={(e) => setEditParentId(e.target.value || null)}>
+          <option value="">（根节点）</option>
+          {nodes.filter((n) => n.id !== editingId).map((n) => (
+            <option key={n.id} value={n.id}>{NODE_TYPE_CONFIG[n.type].icon} {n.title}</option>
+          ))}
+        </select>
+      </div>
+      <div className="form-group">
+        <label>关联章节</label>
+        <select className="select" value={editChapterId} onChange={(e) => setEditChapterId(e.target.value)}>
+          <option value="">不关联</option>
+          {chapters.map((ch) => (
+            <option key={ch.id} value={ch.id}>第{ch.number}章 {ch.title}</option>
+          ))}
+        </select>
+      </div>
+      <div className="form-group">
+        <label>预估字数</label>
+        <input className="input" type="number" value={editEstWords} onChange={(e) => setEditEstWords(Number(e.target.value))} />
+      </div>
+      <div className="form-group">
+        <label>备注</label>
+        <textarea className="textarea" value={editNotes} onChange={(e) => setEditNotes(e.target.value)}
+          placeholder="大纲备注（Markdown）" rows={4} />
+      </div>
+    </>
+  );
+
+  /** 内联详情面板（用于移动端覆盖层，无外层 panel 包裹） */
+  const renderDetailInline = () => {
+    const node = nodes.find((n) => n.id === detailId);
+    if (!node) return null;
+    const linkedChapter = chapters.find((c) => c.id === node.chapterId);
+    const charNames = node.characters.map((id) => characters.find((c) => c.id === id)?.name).filter(Boolean) as string[];
+    const foresP = node.foreshadowsPlanted.map((id) => foreshadows.find((f) => f.id === id)).filter(Boolean);
+    const foresR = node.foreshadowsResolved.map((id) => foreshadows.find((f) => f.id === id)).filter(Boolean);
+    const worlds = node.worldSettingsIntroduced.map((id) => settings.find((s) => s.id === id)).filter(Boolean);
+
+    return (
+      <>
+        <div className={styles.detailHeader}>
+          <h3>{NODE_TYPE_CONFIG[node.type].icon} {node.title}</h3>
+        </div>
+        <div className={styles.detailBody}>
+          {linkedChapter && (
+            <div className={styles.detailSection}>
+              <span className={styles.detailLabel}>关联章节</span>
+              <span>第{linkedChapter.number}章 {linkedChapter.title}</span>
+            </div>
+          )}
+          {(node.estimatedWords ?? 0) > 0 && (
+            <div className={styles.detailSection}>
+              <span className={styles.detailLabel}>预估字数</span>
+              <span>{(node.estimatedWords ?? 0).toLocaleString()} 字</span>
+            </div>
+          )}
+          {charNames.length > 0 && (
+            <div className={styles.detailSection}>
+              <span className={styles.detailLabel}>出场角色</span>
+              <div className={styles.chipList}>
+                {charNames.map((n, i) => <span key={i} className={styles.chip}>{n}</span>)}
+              </div>
+            </div>
+          )}
+          {foresP.length > 0 && (
+            <div className={styles.detailSection}>
+              <span className={styles.detailLabel}>计划埋设伏笔</span>
+              <ul className={styles.detailList}>
+                {foresP.map((f) => <li key={f.id}>🔮 {f.content.slice(0, 60)}{f.content.length > 60 ? '...' : ''}</li>)}
+              </ul>
+            </div>
+          )}
+          {foresR.length > 0 && (
+            <div className={styles.detailSection}>
+              <span className={styles.detailLabel}>计划回收伏笔</span>
+              <ul className={styles.detailList}>
+                {foresR.map((f) => <li key={f.id}>✅ {f.content.slice(0, 60)}{f.content.length > 60 ? '...' : ''}</li>)}
+              </ul>
+            </div>
+          )}
+          {worlds.length > 0 && (
+            <div className={styles.detailSection}>
+              <span className={styles.detailLabel}>引入世界观设定</span>
+              <div className={styles.chipList}>
+                {worlds.map((w) => <span key={w.id} className={styles.chip}>{w.name}</span>)}
+              </div>
+            </div>
+          )}
+          {node.notes && (
+            <div className={styles.detailSection}>
+              <span className={styles.detailLabel}>备注</span>
+              <p className={styles.detailNotes}>{node.notes}</p>
+            </div>
+          )}
+          <div className={styles.detailMeta}>
+            创建于 {new Date(node.createdAt).toLocaleString('zh-CN')}
+          </div>
+        </div>
+      </>
+    );
+  };
+
   if (!currentProject) {
     return <div className="empty-state"><div className="icon">📋</div><p>请先选择一个作品</p></div>;
   }
@@ -748,6 +878,7 @@ export default function OutlinePage() {
         </div>
 
         {/* 右侧面板 */}
+        {!isMobileView && (
         <div className={styles.sidePanel}>
           {(editingId || addingParentId !== null) ? renderEditForm() : renderDetail()}
           {!editingId && addingParentId === null && !detailId && (
@@ -757,7 +888,55 @@ export default function OutlinePage() {
             </div>
           )}
         </div>
+        )}
       </div>
+
+      {/* 移动端全屏大纲详情覆盖层 */}
+      {isMobileView && (editingId || addingParentId !== null) && (
+        <div className={`detail-full-overlay ${styles.mobileOverlay}`}>
+          <div className={`detail-full-panel ${styles.mobileDetailPanel}`}>
+            <div className={`detail-full-nav ${styles.mobileDetailNav}`}>
+              <button className={`detail-full-back ${styles.mobileBackBtn}`} onClick={cancelEdit}>
+                ← 返回大纲
+              </button>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button className="btn btn-primary btn-sm" onClick={saveNode} disabled={!editTitle.trim()}>
+                  {editingId ? '保存' : '创建'}
+                </button>
+                <button className="btn btn-sm" onClick={cancelEdit}>取消</button>
+              </div>
+            </div>
+            <div className={`detail-full-body ${styles.mobileDetailBody}`}>
+              {renderEditFormInline()}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isMobileView && detailId && !editingId && addingParentId === null && (
+        <div className={`detail-full-overlay ${styles.mobileOverlay}`}>
+          <div className={`detail-full-panel ${styles.mobileDetailPanel}`}>
+            <div className={`detail-full-nav ${styles.mobileDetailNav}`}>
+              <button className={`detail-full-back ${styles.mobileBackBtn}`} onClick={() => setDetailId(null)}>
+                ← 返回大纲
+              </button>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button className="btn btn-sm" onClick={() => {
+                  const node = nodes.find((n) => n.id === detailId);
+                  if (node) startEdit(node);
+                }}>编辑</button>
+                <button className="btn btn-sm" onClick={() => {
+                  const node = nodes.find((n) => n.id === detailId);
+                  if (node) handleDelete(node.id);
+                }}>删除</button>
+              </div>
+            </div>
+            <div className={`detail-full-body ${styles.mobileDetailBody}`}>
+              {renderDetailInline()}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 从章节生成大纲弹窗 */}
       {showChapterPicker && (

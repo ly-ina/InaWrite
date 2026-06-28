@@ -7,8 +7,8 @@ android {
         applicationId "com.inakb.novel"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 2
-        versionName "1.1"
+        versionCode 3
+        versionName "1.2"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -61,6 +61,23 @@ dependencies {
 }
 
 apply from: 'capacitor.build.gradle'
+
+// 强制覆盖签名（必须在 capacitor.build.gradle 之后）
+android {
+    signingConfigs {
+        debug {
+            storeFile file('inakb-release.keystore')
+            storePassword 'inakb123'
+            keyAlias 'inakb'
+            keyPassword 'inakb123'
+        }
+    }
+    buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
+    }
+}
 
 try {
     def servicesJSON = file('google-services.json')

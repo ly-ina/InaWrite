@@ -1,10 +1,12 @@
 /**
  * 应用根组件
  * 配置路由：Dashboard、项目管理、角色、章节、伏笔、世界观、资源
+ * 包含 Android 返回按钮处理：按导航栈逐级返回，顶层弹窗确认退出
  */
 
 import { useEffect, useRef } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { App as CapacitorApp } from '@capacitor/app';
 import Layout from './components/Layout';
 import DashboardPage from './pages/Dashboard';
 import ProjectsPage from './pages/Projects';
@@ -27,26 +29,114 @@ import './styles/global.css';
 export default function App() {
   return (
     <HashRouter>
-      <Routes>
-        <Route path="/" element={<Layout />}>
-          <Route index element={<Navigate to="/projects" replace />} />
-          <Route path="dashboard" element={<DashboardPage />} />
-          <Route path="projects" element={<ProjectsPage />} />
-          <Route path="characters" element={<CharactersPage />} />
-          <Route path="chapters" element={<ChaptersPage />} />
-          <Route path="timeline" element={<TimelinePage />} />
-          <Route path="foreshadows" element={<ForeshadowsPage />} />
-          <Route path="worldsettings" element={<WorldSettingsPage />} />
-          <Route path="resources" element={<ResourcesPage />} />
-          <Route path="templates" element={<TemplatesPage />} />
-          <Route path="ai" element={<AIAssistantPage />} />
-          <Route path="outline" element={<OutlinePage />} />
-          <Route path="tags" element={<TagsPage />} />
-          <Route path="about" element={<AboutPage />} />
-        </Route>
-      </Routes>
+      <AppRoutes />
       <ElectronIntegration />
     </HashRouter>
+  );
+}
+
+/** 路由 + Android 返回按钮处理 */
+function AppRoutes() {
+  const navStackRef = useRef<string[]>([]);
+  const exitBlockedRef = useRef(false);
+
+  // 维护导航历史栈（HashRouter 下 window.history.back 不可靠）
+  useEffect(() => {
+    const track = () => {
+      const path = window.location.hash.replace('#/', '/') || '/projects';
+      const stack = navStackRef.current;
+      // 如果当前已经在栈顶，不重复
+      if (stack.length > 0 && stack[stack.length - 1] === path) return;
+      stack.push(path);
+      if (stack.length > 30) stack.shift();
+    };
+    track();
+    window.addEventListener('hashchange', track);
+    return () => window.removeEventListener('hashchange', track);
+  }, []);
+
+  // Android 返回按钮处理
+  useEffect(() => {
+    let handle: { remove: () => Promise<void> } | null = null;
+
+    // 检测是否在 Capacitor 原生环境中
+    const isNative = !!(window as any).Capacitor?.isNativePlatform?.();
+
+    if (!isNative) return; // 浏览器环境跳过
+
+    const setupBackButton = async () => {
+      try {
+        handle = await CapacitorApp.addListener('backButton', () => {
+          // 1. 关闭全屏详情覆盖层
+          const overlay = document.querySelector('.detail-full-overlay');
+          if (overlay) {
+            const backBtn = overlay.querySelector('.detail-full-back') as HTMLElement;
+            if (backBtn) { backBtn.click(); return; }
+          }
+
+          // 2. 关闭侧边栏
+          const sidebar = document.querySelector('.sf-sidebar.open');
+          if (sidebar) {
+            const mask = document.querySelector('.mobile-overlay') as HTMLElement;
+            if (mask) { mask.click(); return; }
+          }
+
+          // 3. 关闭模态框
+          const modal = document.querySelector('.modal-overlay');
+          if (modal) {
+            (modal as HTMLElement).click();
+            return;
+          }
+
+          // 4. 导航栈返回
+          const stack = navStackRef.current;
+          if (stack.length > 1) {
+            stack.pop();
+            const prev = stack[stack.length - 1];
+            stack.pop();
+            window.location.hash = '#' + prev;
+          } else {
+            // 5. 顶层 → 确认退出
+            if (exitBlockedRef.current) return;
+            exitBlockedRef.current = true;
+            const exit = window.confirm('确定要退出应用吗？');
+            exitBlockedRef.current = false;
+            if (exit) {
+              CapacitorApp.exitApp();
+            }
+          }
+        });
+      } catch (err) {
+        console.log('BackButton setup failed (non-native environment):', err);
+      }
+    };
+
+    setupBackButton();
+
+    return () => {
+      if (handle) handle.remove();
+    };
+  }, []);
+
+  return (
+    <Routes>
+      <Route path="/" element={<Layout />}>
+        <Route index element={<Navigate to="/projects" replace />} />
+        <Route path="dashboard" element={<DashboardPage />} />
+        <Route path="projects" element={<ProjectsPage />} />
+        <Route path="characters" element={<CharactersPage />} />
+        <Route path="chapters" element={<ChaptersPage />} />
+        <Route path="timeline" element={<TimelinePage />} />
+        <Route path="foreshadows" element={<ForeshadowsPage />} />
+        <Route path="worldsettings" element={<WorldSettingsPage />} />
+        <Route path="resources" element={<ResourcesPage />} />
+        <Route path="templates" element={<TemplatesPage />} />
+        <Route path="ai" element={<AIAssistantPage />} />
+        <Route path="outline" element={<OutlinePage />} />
+        <Route path="tags" element={<TagsPage />} />
+        <Route path="about" element={<AboutPage />} />
+      </Route>
+    </Routes>
   );
 }
 
