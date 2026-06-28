@@ -100,6 +100,14 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+
+      - name: Read versionCode
+        id: version
+        run: |
+          VC=$(grep -oP 'versionCode\s+\K\d+' android/app/build.gradle)
+          echo "vc=$VC" >> $GITHUB_OUTPUT
+
       - name: Download APK
         uses: actions/download-artifact@v4
         with:
@@ -117,11 +125,22 @@ jobs:
             app-release.apk
             Novel-InaKB.exe
           body: |
-            ## 更新说明
+            ## v${{ github.ref_name }}
 
-            versionCode=自动递增
+            versionCode=${{ steps.version.outputs.vc }}
 
-            - Android: app-release.apk（覆盖安装，保留数据）
-            - PC: Novel-InaKB.exe（解压后替换旧版）
+            ### 更新内容
+            - 🎨 全新 OTA 更新弹窗 UI
+            - 🔍 关于页面版本检测
+            - 🏷️ 标签筛选多选 + 通用搜索选择器
+            - 📖 章节排序/跳转
+            - 🔮 伏笔可搜索筛选
+            - 🐛 修复 PC 端更新检测
+
+            ### 下载
+            - 📱 Android: app-release.apk（覆盖安装，保留数据）
+            - 🖥️ PC: Novel-InaKB.exe（解压后替换旧版）
+          draft: false
+          prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
