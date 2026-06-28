@@ -6,7 +6,7 @@
  */
 
 /** 当前版本号（与 build.gradle 中的 versionCode 保持一致） */
-const CURRENT_VERSION_CODE = 4;
+const CURRENT_VERSION_CODE = 5;
 const CURRENT_VERSION_NAME = '1.3';
 
 /** GitHub Releases API */
