@@ -15,3 +15,5 @@ android/build/
 android/captures/
 *.apk
 *.aab
+.build-hashes.json 
+keystore-base64.txt 
