@@ -6,30 +6,7 @@ on:
       - 'v*'
 
 jobs:
-  bump-version:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Bump version
-        run: python scripts/bump-version.py
-
-      - name: Commit version bump
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add android/app/build.gradle src/utils/updater.ts
-          git diff --staged --quiet || (git commit -m "chore: bump versionCode [skip ci]" && git push)
-
   build-android:
-    needs: bump-version
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -62,6 +39,9 @@ jobs:
       - name: Sync Android
         run: npx cap sync android
 
+      - name: Make gradlew executable
+        run: chmod +x android/gradlew
+
       - name: Build APK
         working-directory: android
         run: ./gradlew assembleRelease
@@ -73,7 +53,6 @@ jobs:
           path: android/app/build/outputs/apk/release/app-release.apk
 
   build-pc:
-    needs: bump-version
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -128,7 +107,7 @@ jobs:
           body: |
             ## 更新说明
 
-            versionCode=自动递增，见 build.gradle
+            versionCode=自动递增
 
             - Android: app-release.apk（覆盖安装，保留数据）
             - PC: Novel-InaKB.exe（解压后替换旧版）
