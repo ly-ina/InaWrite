@@ -6,8 +6,8 @@
  */
 
 /** 当前版本号（与 build.gradle 中的 versionCode 保持一致） */
-const CURRENT_VERSION_CODE = 7;
-const CURRENT_VERSION_NAME = '1.6';
+const CURRENT_VERSION_CODE = 8;
+const CURRENT_VERSION_NAME = '1.7';
 
 /** GitHub Releases API */
 const GITHUB_API = 'https://api.github.com/repos/ly-ina/InaWrite/releases/latest';
@@ -200,47 +200,9 @@ export async function downloadUpdate(
     return { uri: savePath, platform: 'pc' };
   }
 
-  // Android：前端 fetch 下载
-  let merged: Uint8Array;
-
-  try {
-    const { resp } = await fetchWithMirrors(url, onProgress);
-
-    if (resp.body?.getReader) {
-      const contentLength = resp.headers.get('content-length');
-      const total = contentLength ? parseInt(contentLength) : 0;
-
-      const reader = resp.body.getReader();
-      const chunks: Uint8Array[] = [];
-      let received = 0;
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        chunks.push(value);
-        received += value.length;
-        if (total > 0 && onProgress) {
-          onProgress(Math.round((received / total) * 100));
-        }
-      }
-
-      const totalLength = chunks.reduce((sum, c) => sum + c.length, 0);
-      merged = new Uint8Array(totalLength);
-      let offset = 0;
-      for (const chunk of chunks) {
-        merged.set(chunk, offset);
-        offset += chunk.length;
-      }
-    } else {
-      console.log('[OTA] 流式读取不可用，使用 arrayBuffer');
-      const buf = await resp.arrayBuffer();
-      merged = new Uint8Array(buf);
-      if (onProgress) onProgress(100);
-    }
-  } catch (err: any) {
-    console.warn('[OTA] fetch 流式下载失败:', err.message, '，回退到 XHR');
-    merged = await downloadWithXHR(url, onProgress);
-  }
+  // Android：直接使用 XMLHttpRequest（WebView 中比 fetch 更可靠）
+  // fetch 在 WebView 中对大文件流式读取和 302 重定向支持不好
+  const merged = await downloadWithXHR(url, onProgress);
 
   // Android: 写入 Cache 目录，用原生安装器打开
   const { Filesystem, Directory } = await import('@capacitor/filesystem');
@@ -264,18 +226,45 @@ function downloadWithXHR(
   url: string,
   onProgress?: (pct: number) => void
 ): Promise<Uint8Array> {
+  // GitHub Release 下载 URL 前缀
+  const githubPrefix = 'https://github.com/';
+  let relativePath = '';
+  if (url.startsWith(githubPrefix)) {
+    relativePath = url.slice(githubPrefix.length);
+  }
+
+  // 构建多个下载 URL（直连 + 镜像）
+  const urls = [
+    url, // 直连
+    ...(relativePath ? [
+      `https://gh-proxy.com/${relativePath}`,
+      `https://gh.llkk.cc/${relativePath}`,
+      `https://github.moeyy.xyz/${relativePath}`,
+    ] : []),
+  ];
+
+  return tryXHR(urls, 0, onProgress);
+}
+
+/** 逐个尝试 XHR 下载 */
+function tryXHR(
+  urls: string[],
+  index: number,
+  onProgress?: (pct: number) => void
+): Promise<Uint8Array> {
   return new Promise((resolve, reject) => {
-    // 尝试镜像 URL
-    const githubPrefix = 'https://github.com/';
-    let xhrUrl = url;
-    if (url.startsWith(githubPrefix)) {
-      const relativePath = url.slice(githubPrefix.length);
-      xhrUrl = `https://gh-proxy.com/${relativePath}`;
+    if (index >= urls.length) {
+      reject(new Error('所有下载源均失败，请检查网络连接'));
+      return;
     }
+
+    const xhrUrl = urls[index];
+    console.log(`[OTA] XHR 尝试下载: ${xhrUrl}`);
 
     const xhr = new XMLHttpRequest();
     xhr.open('GET', xhrUrl, true);
     xhr.responseType = 'arraybuffer';
+    xhr.timeout = 30000; // 单个源 30 秒超时
 
     xhr.onprogress = (e) => {
       if (e.lengthComputable && onProgress) {
@@ -285,15 +274,23 @@ function downloadWithXHR(
 
     xhr.onload = () => {
       if (xhr.status >= 200 && xhr.status < 300) {
+        console.log(`[OTA] XHR 下载成功: ${xhrUrl}`);
         resolve(new Uint8Array(xhr.response));
       } else {
-        reject(new Error(`XHR 下载失败: ${xhr.status}`));
+        console.warn(`[OTA] XHR ${xhrUrl} 返回 ${xhr.status}，尝试下一个`);
+        tryXHR(urls, index + 1, onProgress).then(resolve).catch(reject);
       }
     };
 
-    xhr.onerror = () => reject(new Error('XHR 网络错误'));
-    xhr.ontimeout = () => reject(new Error('XHR 下载超时'));
-    xhr.timeout = 120000; // 2 分钟超时
+    xhr.onerror = () => {
+      console.warn(`[OTA] XHR ${xhrUrl} 网络错误，尝试下一个`);
+      tryXHR(urls, index + 1, onProgress).then(resolve).catch(reject);
+    };
+
+    xhr.ontimeout = () => {
+      console.warn(`[OTA] XHR ${xhrUrl} 超时，尝试下一个`);
+      tryXHR(urls, index + 1, onProgress).then(resolve).catch(reject);
+    };
 
     xhr.send();
   });
