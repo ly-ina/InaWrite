@@ -9,6 +9,7 @@ import { useCharacterStore } from '../store/characterStore';
 import { useChapterStore } from '../store/chapterStore';
 import { useAppStore } from '../store/appStore';
 import { STATUS_LABELS, type Foreshadow } from '../types';
+import SearchableSelect from '../components/SearchableSelect';
 import styles from './Foreshadows.module.css';
 
 /** 看板列配置 */
@@ -24,6 +25,14 @@ export default function ForeshadowsPage() {
   const { foreshadows, loading, loadForeshadows, createForeshadow, updateForeshadow, deleteForeshadow } = useForeshadowStore();
   const { characters, loadCharacters } = useCharacterStore();
   const { chapters, loadChapters } = useChapterStore();
+
+  // 移动端检测
+  const [isMobileView, setIsMobileView] = useState(() => window.innerWidth <= 768);
+  useEffect(() => {
+    const check = () => setIsMobileView(window.innerWidth <= 768);
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
   const [showCreate, setShowCreate] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -61,6 +70,10 @@ export default function ForeshadowsPage() {
   // 获取名字
   const getCharName = (id: string) => characters.find((c) => c.id === id)?.name || '未知';
   const getChapterTitle = (id: string) => chapters.find((ch) => ch.id === id)?.title || `章节#${id.slice(-4)}`;
+
+  // 选项数据（给 SearchableSelect 用）
+  const chapterOptions = chapters.map((ch) => ({ id: ch.id, label: ch.title, sub: `第${ch.number}章` }));
+  const characterOptions = characters.map((c) => ({ id: c.id, label: c.name }));
 
   // 创建
   const handleCreate = async () => {
@@ -152,21 +165,27 @@ export default function ForeshadowsPage() {
     <div className={styles.page}>
       <div className="page-header">
         <h1>伏笔追踪</h1>
-        <div className="actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <select className="select" value={filterChapterId} onChange={(e) => setFilterChapterId(e.target.value)}
-            style={{ fontSize: '12px', width: '140px' }}>
-            <option value="">全部章节</option>
-            {chapters.map((ch) => (
-              <option key={ch.id} value={ch.id}>第{ch.number}章 {ch.title}</option>
-            ))}
-          </select>
-          <select className="select" value={filterCharId} onChange={(e) => setFilterCharId(e.target.value)}
-            style={{ fontSize: '12px', width: '120px' }}>
-            <option value="">全部角色</option>
-            {characters.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
+        <div className="actions" style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <SearchableSelect
+            options={chapterOptions}
+            value={filterChapterId}
+            onChange={(id) => { setFilterChapterId(id); setFilterCharId(''); }}
+            placeholder="搜索章节..."
+            emptyLabel="全部章节"
+            isMobile={isMobileView}
+            modalTitle="筛选章节"
+            style={{ width: isMobileView ? '100%' : '140px' }}
+          />
+          <SearchableSelect
+            options={characterOptions}
+            value={filterCharId}
+            onChange={(id) => { setFilterCharId(id); setFilterChapterId(''); }}
+            placeholder="搜索角色..."
+            emptyLabel="全部角色"
+            isMobile={isMobileView}
+            modalTitle="筛选角色"
+            style={{ width: isMobileView ? '100%' : '120px' }}
+          />
           {(filterChapterId || filterCharId) && (
             <button className="btn btn-sm btn-ghost" onClick={() => { setFilterChapterId(''); setFilterCharId(''); }}
               style={{ fontSize: '11px' }}>
@@ -273,13 +292,15 @@ export default function ForeshadowsPage() {
               </div>
               <div className="form-group">
                 <label>首次出现章节</label>
-                <select className="select" value={editingF.firstAppearance}
-                  onChange={(e) => setEditingF({ ...editingF, firstAppearance: e.target.value })}>
-                  <option value="">未选择</option>
-                  {chapters.map((ch) => (
-                    <option key={ch.id} value={ch.id}>第{ch.number}章 {ch.title}</option>
-                  ))}
-                </select>
+                <SearchableSelect
+                  options={chapterOptions}
+                  value={editingF.firstAppearance}
+                  onChange={(id) => setEditingF({ ...editingF, firstAppearance: id })}
+                  placeholder="搜索章节..."
+                  emptyLabel="未选择"
+                  isMobile={isMobileView}
+                  modalTitle="选择章节"
+                />
               </div>
               <div className="form-group">
                 <label>补充说明</label>
@@ -349,24 +370,36 @@ export default function ForeshadowsPage() {
             </div>
             <div className="form-group">
               <label>首次出现章节</label>
-              <select className="select" value={formFirstChapter}
-                onChange={(e) => setFormFirstChapter(e.target.value)}>
-                <option value="">未选择</option>
-                {chapters.map((ch) => (
-                  <option key={ch.id} value={ch.id}>第{ch.number}章 {ch.title}</option>
-                ))}
-              </select>
+              <SearchableSelect
+                options={chapterOptions}
+                value={formFirstChapter}
+                onChange={setFormFirstChapter}
+                placeholder="搜索章节..."
+                emptyLabel="未选择"
+                isMobile={isMobileView}
+                modalTitle="选择章节"
+              />
             </div>
             <div className="form-group">
-              <label>相关角色</label>
-              <div style={{ maxHeight: '120px', overflow: 'auto' }}>
-                {characters.map((c) => (
-                  <label key={c.id} style={{ fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
-                    <input type="checkbox" checked={formRelatedChars.includes(c.id)}
-                      onChange={() => toggleSelect(c.id, formRelatedChars, setFormRelatedChars)} />
-                    {c.name}
-                  </label>
-                ))}
+              <label>相关角色（已选 {formRelatedChars.length}）</label>
+              <div style={{ maxHeight: '160px', overflow: 'auto', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', padding: '4px' }}>
+                {characters.length === 0 ? (
+                  <div style={{ padding: '8px', fontSize: '12px', color: 'var(--text-muted)' }}>暂无角色</div>
+                ) : (
+                  characters.map((c) => (
+                    <label key={c.id} style={{
+                      fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px',
+                      padding: '5px 8px', borderRadius: 'var(--radius-sm)', transition: 'background 0.1s',
+                    }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-hover)')}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                    >
+                      <input type="checkbox" checked={formRelatedChars.includes(c.id)}
+                        onChange={() => toggleSelect(c.id, formRelatedChars, setFormRelatedChars)} />
+                      {c.name}
+                    </label>
+                  ))
+                )}
               </div>
             </div>
             <div className="form-actions">

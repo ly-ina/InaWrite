@@ -4,15 +4,15 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
-import { useT } from '../i18n';
-import { useT } from '../i18n';
 import { useCharacterStore } from '../store/characterStore';
 import { useChapterStore } from '../store/chapterStore';
 import { useAppStore } from '../store/appStore';
-import { generateId, STATUS_LABELS, RELATION_TYPES, RESOURCE_STATUS_LABELS, type Character, type Relation, type Resource, type ResourceStatus } from '../types';
+import { generateId, STATUS_LABELS, RELATION_TYPES, RESOURCE_STATUS_LABELS, type Character, type Relation, type Resource, type ResourceStatus, type Tag, type TagAssignment } from '../types';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { RelationGraph } from '../components/RelationGraph';
 import MarkdownEditor from '../components/MarkdownEditor';
+import SearchableSelect from '../components/SearchableSelect';
+import { db } from '../db/database';
 import { useUndoStore } from '../store/undoStore';
 import { checkCharacterReferences, cleanupDanglingReferences } from '../utils/validation';
 import ReactMarkdown from 'react-markdown';
@@ -46,6 +46,27 @@ export default function CharactersPage() {
   const [search, setSearch] = useState('');
   const [filterRace, setFilterRace] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  const [filterTags, setFilterTags] = useState<Set<string>>(new Set());
+  const [filterLocation, setFilterLocation] = useState('');
+
+  // 标签筛选搜索（PC 端下拉搜索 + 移动端弹窗搜索）
+  const [tagSearch, setTagSearch] = useState('');
+  const [showTagPicker, setShowTagPicker] = useState(false); // 移动端标签筛选弹窗
+
+  // 标签多选辅助
+  const toggleFilterTag = (tagId: string) => {
+    setFilterTags((prev) => {
+      const next = new Set(prev);
+      if (next.has(tagId)) next.delete(tagId);
+      else next.add(tagId);
+      return next;
+    });
+  };
+  const clearFilterTags = () => setFilterTags(new Set());
+
+  // 全局标签系统
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [tagAssignments, setTagAssignments] = useState<TagAssignment[]>([]);
 
   // 新角色表单
   const [formName, setFormName] = useState('');
@@ -80,13 +101,44 @@ export default function CharactersPage() {
   const [resStatus, setResStatus] = useState<ResourceStatus>('已获得');
   const [resObtainedAt, setResObtainedAt] = useState('');
 
-  // 加载数据
+  // 加载数据 + 全局标签
   useEffect(() => {
     if (currentProject) {
       loadCharacters(currentProject.id);
       loadChapters(currentProject.id);
+      loadTagsAndAssignments(currentProject.id);
     }
   }, [currentProject, loadCharacters, loadChapters, refreshKey]);
+
+  const loadTagsAndAssignments = async (projectId: string) => {
+    const [allTags, allAssignments] = await Promise.all([
+      db.tags.getByProject(projectId),
+      db.tagAssignments.getAll(),
+    ]);
+    setTags(allTags);
+    setTagAssignments(allAssignments);
+  };
+
+  /** 获取角色的标签列表 */
+  const getCharTags = useCallback((charId: string): Tag[] => {
+    const assigned = tagAssignments.filter((a) => a.targetType === 'character' && a.targetId === charId);
+    return assigned.map((a) => tags.find((t) => t.id === a.tagId)).filter(Boolean) as Tag[];
+  }, [tagAssignments, tags]);
+
+  /** 切换角色标签 */
+  const toggleCharTag = async (charId: string, tagId: string) => {
+    const existing = tagAssignments.find((a) => a.tagId === tagId && a.targetType === 'character' && a.targetId === charId);
+    if (existing) {
+      await db.tagAssignments.remove(existing.id);
+    } else {
+      await db.tagAssignments.add({
+        id: generateId(), tagId, targetType: 'character', targetId: charId,
+      });
+    }
+    // 重新加载
+    const allAssignments = await db.tagAssignments.getAll();
+    setTagAssignments(allAssignments);
+  };
 
   // 选中的角色
   const selectedChar = selectedId ? characters.find((c) => c.id === selectedId) : null;
@@ -96,11 +148,22 @@ export default function CharactersPage() {
     if (search && !c.name.includes(search) && !c.aliases?.some((a) => a.includes(search))) return false;
     if (filterRace && c.race !== filterRace) return false;
     if (filterStatus && c.status !== filterStatus) return false;
+    if (filterLocation && c.currentLocation !== filterLocation) return false;
+    if (filterTags.size > 0) {
+      const charTags = getCharTags(c.id);
+      // 角色必须拥有所有选中的标签
+      const charTagIds = new Set(charTags.map((t) => t.id));
+      for (const tid of filterTags) {
+        if (!charTagIds.has(tid)) return false;
+      }
+    }
     return true;
   });
 
   // 收集所有种族用于筛选
   const allRaces = [...new Set(characters.map((c) => c.race).filter(Boolean))];
+  // 收集所有所在地用于筛选
+  const allLocations = [...new Set(characters.map((c) => c.currentLocation).filter(Boolean))];
 
   // 获取章节标题
   const getChapterTitle = useCallback(
@@ -403,16 +466,100 @@ export default function CharactersPage() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
-              <select
-                className="select"
+              {/* 标签筛选：PC 可搜索下拉 / 移动端弹窗按钮 */}
+              {/* 标签筛选：多选 */}
+              {isMobileView ? (
+                <>
+                  <button className="select" style={{ textAlign: 'left', color: filterTags.size > 0 ? 'var(--text-primary)' : 'var(--text-muted)' }}
+                    onClick={() => { setShowTagPicker(true); setTagSearch(''); }}>
+                    {filterTags.size > 0 ? `🏷 已选 ${filterTags.size} 个标签` : '全部标签'}
+                  </button>
+                  {showTagPicker && (
+                    <div className="modal-overlay" onClick={() => setShowTagPicker(false)}>
+                      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '380px', width: '90%' }}>
+                        <h3>选择标签（多选）</h3>
+                        <input className="input" placeholder="搜索标签..." value={tagSearch}
+                          onChange={(e) => setTagSearch(e.target.value)} autoFocus
+                          style={{ marginBottom: '8px' }} />
+                        <div style={{ maxHeight: '260px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          {tags.filter((t) => !tagSearch || t.name.toLowerCase().includes(tagSearch.toLowerCase())).map((t) => (
+                            <div key={t.id} className={styles.tagPickerOption}
+                              style={{
+                                fontWeight: filterTags.has(t.id) ? 600 : 400,
+                                borderLeft: `3px solid ${t.color}`,
+                                background: filterTags.has(t.id) ? 'var(--bg-hover)' : 'transparent',
+                              }}
+                              onClick={() => toggleFilterTag(t.id)}>
+                              {filterTags.has(t.id) ? '☑' : '☐'} 🏷 {t.name}
+                            </div>
+                          ))}
+                          {tags.length === 0 && <div style={{ padding: '10px', color: 'var(--text-muted)', fontSize: '13px' }}>暂无标签</div>}
+                        </div>
+                        <div className="form-actions" style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px solid var(--border-color)' }}>
+                          <button className="btn" onClick={() => { clearFilterTags(); setShowTagPicker(false); }}>清除</button>
+                          <button className="btn btn-primary" onClick={() => setShowTagPicker(false)}>确定 ({filterTags.size})</button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className={styles.tagFilterDropdown}>
+                  {/* 已选标签 */}
+                  {filterTags.size > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px', marginBottom: '4px' }}>
+                      {Array.from(filterTags).map((tid) => {
+                        const t = tags.find((x) => x.id === tid);
+                        return t ? (
+                          <span key={tid} className={styles.tagFilterChip}
+                            style={{ background: t.color + '20', color: t.color, borderColor: t.color }}
+                            onClick={() => toggleFilterTag(tid)}>
+                            {t.name} ✕
+                          </span>
+                        ) : null;
+                      })}
+                      <span className={styles.tagFilterClear} onClick={clearFilterTags}>清除全部</span>
+                    </div>
+                  )}
+                  {/* 搜索框 + 下拉 */}
+                  <input className="input" placeholder="搜索标签筛选..." value={tagSearch}
+                    onChange={(e) => setTagSearch(e.target.value)}
+                    style={{ fontSize: '12px', padding: '5px 8px' }} />
+                  {tagSearch && (
+                    <div className={styles.tagFilterList}>
+                      {tags.filter((t) => t.name.toLowerCase().includes(tagSearch.toLowerCase()) && !filterTags.has(t.id)).length === 0 ? (
+                        <div className={styles.tagFilterEmpty}>无匹配标签</div>
+                      ) : (
+                        tags.filter((t) => t.name.toLowerCase().includes(tagSearch.toLowerCase()) && !filterTags.has(t.id)).map((t) => (
+                          <div key={t.id} className={styles.tagFilterItem}
+                            style={{ borderLeft: `3px solid ${t.color}` }}
+                            onClick={() => { toggleFilterTag(t.id); setTagSearch(''); }}>
+                            🏷 {t.name}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+              <SearchableSelect
+                options={allRaces.map((r) => ({ id: r, label: r }))}
                 value={filterRace}
-                onChange={(e) => setFilterRace(e.target.value)}
-              >
-                <option value="">全部种族</option>
-                {allRaces.map((r) => (
-                  <option key={r} value={r}>{r}</option>
-                ))}
-              </select>
+                onChange={(id) => { setFilterRace(id); clearFilterTags(); }}
+                placeholder="搜索种族..."
+                emptyLabel="全部种族"
+                isMobile={isMobileView}
+                modalTitle="选择种族"
+              />
+              <SearchableSelect
+                options={allLocations.map((l) => ({ id: l, label: l }))}
+                value={filterLocation}
+                onChange={(id) => { setFilterLocation(id); clearFilterTags(); }}
+                placeholder="搜索所在地..."
+                emptyLabel="全部所在地"
+                isMobile={isMobileView}
+                modalTitle="选择所在地"
+              />
               <select
                 className="select"
                 value={filterStatus}
@@ -424,6 +571,11 @@ export default function CharactersPage() {
                 <option value="unknown">未知</option>
                 <option value="mentioned">提及</option>
               </select>
+              {(filterTags.size > 0 || filterRace || filterStatus || filterLocation) && (
+                <button className="btn btn-sm btn-ghost" onClick={() => { clearFilterTags(); setFilterRace(''); setFilterStatus(''); setFilterLocation(''); }}>
+                  清除筛选
+                </button>
+              )}
             </div>
 
             {loading ? (
@@ -453,10 +605,23 @@ export default function CharactersPage() {
                       <div className={styles.charName}>{char.name}</div>
                       <div className={styles.charMeta}>
                         {char.race && <span>{char.race}</span>}
+                        {char.currentLocation && <span>📍 {char.currentLocation}</span>}
                         <span className={`tag tag-${char.status}`}>
                           {STATUS_LABELS[char.status]}
                         </span>
                       </div>
+                      {getCharTags(char.id).length > 0 && (
+                        <div className={styles.charTags}>
+                          {getCharTags(char.id).slice(0, 3).map((tag) => (
+                            <span key={tag.id} className={styles.charTagBadge} style={{ background: tag.color + '20', color: tag.color, borderColor: tag.color }}>
+                              {tag.name}
+                            </span>
+                          ))}
+                          {getCharTags(char.id).length > 3 && (
+                            <span className={styles.charTagMore}>+{getCharTags(char.id).length - 3}</span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -564,6 +729,42 @@ export default function CharactersPage() {
                     <button className="btn btn-danger btn-sm" onClick={() => handleDelete(selectedChar.id, selectedChar.name)}>删除</button>
                   </div>
                 </div>
+
+                {/* 标签 */}
+                <section className={styles.section}>
+                  <h3>🏷 标签</h3>
+                  <div className={styles.tagPicker}>
+                    {getCharTags(selectedChar.id).map((tag) => (
+                      <span
+                        key={tag.id}
+                        className={styles.tagBadge}
+                        style={{ background: tag.color + '20', color: tag.color, borderColor: tag.color }}
+                        onClick={() => toggleCharTag(selectedChar.id, tag.id)}
+                        title="点击移除"
+                      >
+                        {tag.name} ✕
+                      </span>
+                    ))}
+                    {tags.filter((t) => !getCharTags(selectedChar.id).some((ct) => ct.id === t.id)).length > 0 && (
+                      <details className={styles.tagDropdown}>
+                        <summary className={styles.tagAddBtn}>+ 添加标签</summary>
+                        <div className={styles.tagDropdownList}>
+                          {tags.filter((t) => !getCharTags(selectedChar.id).some((ct) => ct.id === t.id)).map((tag) => (
+                            <span
+                              key={tag.id}
+                              className={styles.tagOption}
+                              style={{ borderLeft: `3px solid ${tag.color}` }}
+                              onClick={() => toggleCharTag(selectedChar.id, tag.id)}
+                            >
+                              {tag.name}
+                            </span>
+                          ))}
+                        </div>
+                      </details>
+                    )}
+                    {tags.length === 0 && <span className={styles.tagEmpty}>暂无标签，去「🏷 标签管理」创建</span>}
+                  </div>
+                </section>
 
                 {/* 基本信息 */}
                 <section className={styles.section}>
@@ -889,6 +1090,36 @@ export default function CharactersPage() {
                     </div>
                   </div>
                 </div>
+
+                {/* 移动端标签 */}
+                <section className={styles.section}>
+                  <h3>🏷 标签</h3>
+                  <div className={styles.tagPicker}>
+                    {getCharTags(selectedChar.id).map((tag) => (
+                      <span key={tag.id} className={styles.tagBadge}
+                        style={{ background: tag.color + '20', color: tag.color, borderColor: tag.color }}
+                        onClick={() => toggleCharTag(selectedChar.id, tag.id)}>
+                        {tag.name} ✕
+                      </span>
+                    ))}
+                    {tags.filter((t) => !getCharTags(selectedChar.id).some((ct) => ct.id === t.id)).length > 0 && (
+                      <details className={styles.tagDropdown}>
+                        <summary className={styles.tagAddBtn}>+ 添加标签</summary>
+                        <div className={styles.tagDropdownList}>
+                          {tags.filter((t) => !getCharTags(selectedChar.id).some((ct) => ct.id === t.id)).map((tag) => (
+                            <span key={tag.id} className={styles.tagOption}
+                              style={{ borderLeft: `3px solid ${tag.color}` }}
+                              onClick={() => toggleCharTag(selectedChar.id, tag.id)}>
+                              {tag.name}
+                            </span>
+                          ))}
+                        </div>
+                      </details>
+                    )}
+                    {tags.length === 0 && <span className={styles.tagEmpty}>暂无标签，去「🏷 标签管理」创建</span>}
+                  </div>
+                </section>
+
                 <section className={styles.section}>
                   <h3>基本信息</h3>
                   {selectedChar.currentLocation && (

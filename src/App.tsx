@@ -4,7 +4,7 @@
  * 包含 Android 返回按钮处理：按导航栈逐级返回，顶层弹窗确认退出
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { App as CapacitorApp } from '@capacitor/app';
 import ConfirmDialog from './components/ConfirmDialog';
@@ -25,6 +25,7 @@ import AboutPage from './pages/About';
 import { electronBridge } from './utils/electronBridge';
 import { useAppStore } from './store/appStore';
 import { db } from './db/database';
+import { checkForUpdate, downloadUpdate, installApk, getCurrentVersion } from './utils/updater';
 import './styles/global.css';
 
 export default function App() {
@@ -36,10 +37,68 @@ export default function App() {
   );
 }
 
-/** 路由 + Android 返回按钮处理 */
+/** 路由 + Android 返回按钮处理 + OTA 更新检测 */
 function AppRoutes() {
   const navStackRef = useRef<string[]>([]);
   const [exitDialog, setExitDialog] = useState(false);
+  const [updateDialog, setUpdateDialog] = useState(false);
+  const [updateInfo, setUpdateInfo] = useState<{ version: string; changelog: string; downloadUrl: string; fileExt?: string } | null>(null);
+  const [updateProgress, setUpdateProgress] = useState(0);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [updateStatus, setUpdateStatus] = useState('');
+
+  // OTA 更新检测
+  const doUpdateCheck = useCallback(async () => {
+    const isNative = !!(window as any).Capacitor?.isNativePlatform?.();
+    const isElectron = !!(window as any).electronBridge?.isElectron;
+    if (!isNative && !isElectron) return; // 浏览器环境跳过
+
+    console.log('[OTA] 检查更新...');
+    const info = await checkForUpdate();
+    if (info) {
+      console.log('[OTA] 发现新版本:', info.version, 'platform:', info.fileExt);
+      setUpdateInfo({
+        version: info.version,
+        changelog: info.changelog,
+        downloadUrl: info.downloadUrl,
+      });
+      setUpdateDialog(true);
+    } else {
+      console.log('[OTA] 已是最新版本');
+    }
+  }, []);
+
+  // 下载并安装更新
+  const handleDownloadUpdate = async () => {
+    if (!updateInfo) return;
+    setIsDownloading(true);
+    setUpdateProgress(0);
+    setUpdateStatus('正在下载更新...');
+    try {
+      const filename = `InaKB-${updateInfo.version}${updateInfo.fileExt || '.apk'}`;
+      const result = await downloadUpdate(updateInfo.downloadUrl, filename, (pct) => {
+        setUpdateProgress(pct);
+        setUpdateStatus(`下载中 ${pct}%`);
+      });
+      setUpdateDialog(false);
+      if (result.platform === 'android') {
+        setUpdateStatus('下载完成，准备安装...');
+        setTimeout(() => installApk(result.uri), 500);
+      } else {
+        // PC: 浏览器下载已完成，提示用户
+        setUpdateStatus('下载完成！请关闭应用后用新版本 exe 替换旧版');
+      }
+    } catch (err: any) {
+      setUpdateStatus(`下载失败: ${err.message}`);
+      setIsDownloading(false);
+    }
+  };
+
+  // 启动时检查更新（延迟 3 秒，等应用初始化完成）
+  useEffect(() => {
+    const timer = setTimeout(doUpdateCheck, 3000);
+    return () => clearTimeout(timer);
+  }, [doUpdateCheck]);
 
   // 维护导航历史栈（HashRouter 下 window.history.back 不可靠）
   useEffect(() => {
@@ -144,6 +203,54 @@ function AppRoutes() {
           onConfirm={() => CapacitorApp.exitApp()}
           onCancel={() => setExitDialog(false)}
         />
+      )}
+
+      {/* OTA 更新弹窗 */}
+      {updateDialog && updateInfo && (
+        <ConfirmDialog
+          title="发现新版本"
+          message={`版本: ${updateInfo.version}${updateInfo.changelog ? '\n\n更新内容:\n' + updateInfo.changelog : ''}`}
+          confirmLabel={isDownloading ? `下载中 ${updateProgress}%` : '立即更新'}
+          cancelLabel="稍后"
+          onConfirm={handleDownloadUpdate}
+          onCancel={() => setUpdateDialog(false)}
+        />
+      )}
+
+      {/* 更新状态提示 */}
+      {updateStatus && (
+        <div style={{
+          position: 'fixed',
+          bottom: '80px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'var(--surface)',
+          border: '1px solid var(--border-color)',
+          borderRadius: '8px',
+          padding: '10px 20px',
+          zIndex: 9999,
+          boxShadow: '0 2px 12px rgba(0,0,0,0.3)',
+          fontSize: '14px',
+        }}>
+          {updateStatus}
+          {isDownloading && (
+            <div style={{
+              width: '100%',
+              height: '4px',
+              background: 'var(--border-color)',
+              borderRadius: '2px',
+              marginTop: '6px',
+            }}>
+              <div style={{
+                width: `${updateProgress}%`,
+                height: '100%',
+                background: 'var(--primary)',
+                borderRadius: '2px',
+                transition: 'width 0.3s',
+              }} />
+            </div>
+          )}
+        </div>
       )}
     </>
   );

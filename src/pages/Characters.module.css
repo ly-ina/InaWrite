@@ -489,3 +489,191 @@
   padding: 14px;
   -webkit-overflow-scrolling: touch;
 }
+
+/* ========== 标签系统 ========== */
+.charTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 4px;
+}
+
+.charTagBadge {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  border: 1px solid;
+  white-space: nowrap;
+}
+
+.charTagMore {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: var(--bg-hover);
+  color: var(--text-muted);
+}
+
+/* 标签选择器 */
+.tagPicker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.tagBadge {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  border: 1px solid;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tagBadge:hover {
+  opacity: 0.7;
+}
+
+.tagAddBtn {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  border: 1px dashed var(--border-color);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  list-style: none;
+  display: inline-flex;
+}
+
+.tagAddBtn::-webkit-details-marker {
+  display: none;
+}
+
+.tagDropdown {
+  display: inline-flex;
+  position: relative;
+}
+
+.tagDropdownList {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  z-index: 50;
+  max-height: 180px;
+  overflow-y: auto;
+  min-width: 140px;
+}
+
+.tagOption {
+  display: block;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.tagOption:hover {
+  background: var(--bg-hover);
+}
+
+.tagEmpty {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ========== 标签筛选下拉（PC 端可搜索） ========== */
+.tagFilterDropdown {
+  position: relative;
+}
+
+.tagFilterSelected {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  padding: 5px 8px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  background: var(--bg-hover);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.tagFilterList {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 2px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  z-index: 60;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.tagFilterItem {
+  padding: 6px 10px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.tagFilterItem:hover {
+  background: var(--bg-hover);
+}
+
+.tagFilterEmpty {
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.tagFilterChip {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  border: 1px solid;
+  cursor: pointer;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.tagFilterChip:hover {
+  opacity: 0.7;
+}
+
+.tagFilterClear {
+  font-size: 10px;
+  color: var(--danger);
+  cursor: pointer;
+  padding: 1px 4px;
+}
+
+/* ========== 标签选择弹窗选项（移动端） ========== */
+.tagPickerOption {
+  padding: 8px 12px;
+  font-size: 14px;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: background 0.12s;
+}
+
+.tagPickerOption:hover {
+  background: var(--bg-hover);
+}

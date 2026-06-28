@@ -41,8 +41,10 @@ export default function ChaptersPage() {
   const [editingChapter, setEditingChapter] = useState<Chapter | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  // 筛选
+  // 筛选 + 排序
   const [filterStatus, setFilterStatus] = useState('');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [jumpNumber, setJumpNumber] = useState('');
 
   // 表单
   const [formTitle, setFormTitle] = useState('');
@@ -100,9 +102,11 @@ export default function ChaptersPage() {
 
   const selectedChapter = selectedId ? chapters.find((c) => c.id === selectedId) : null;
 
-  const filtered = filterStatus
-    ? chapters.filter((c) => c.status === filterStatus)
-    : chapters;
+  const sorted = useMemo(() => {
+    const list = filterStatus ? chapters.filter((c) => c.status === filterStatus) : [...chapters];
+    list.sort((a, b) => sortOrder === 'asc' ? a.number - b.number : b.number - a.number);
+    return list;
+  }, [chapters, filterStatus, sortOrder]);
 
   // 获取名字（过滤无效引用）
   const validCharIds = useMemo(() => new Set(characters.map((c) => c.id)), [characters]);
@@ -228,22 +232,60 @@ export default function ChaptersPage() {
               className="select"
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
-              style={{ width: '100%' }}
+              style={{ flex: 1 }}
             >
               <option value="">全部状态</option>
               <option value="draft">草稿</option>
               <option value="revising">修订中</option>
               <option value="done">已完成</option>
             </select>
+            <button
+              className="btn btn-sm btn-ghost"
+              onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+              title={sortOrder === 'asc' ? '正序 → 倒序' : '倒序 → 正序'}
+              style={{ fontSize: '14px', flexShrink: 0 }}
+            >
+              {sortOrder === 'asc' ? '↓' : '↑'}
+            </button>
+            <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+              <input
+                className="input"
+                type="number"
+                placeholder="跳转"
+                value={jumpNumber}
+                onChange={(e) => setJumpNumber(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && jumpNumber) {
+                    const target = sorted.find((c) => c.number === parseInt(jumpNumber));
+                    if (target) setSelectedId(target.id);
+                    setJumpNumber('');
+                  }
+                }}
+                style={{ width: '56px', padding: '4px 6px', fontSize: '12px', textAlign: 'center' }}
+              />
+              <button
+                className="btn btn-sm btn-ghost"
+                onClick={() => {
+                  if (jumpNumber) {
+                    const target = sorted.find((c) => c.number === parseInt(jumpNumber));
+                    if (target) setSelectedId(target.id);
+                    setJumpNumber('');
+                  }
+                }}
+                style={{ fontSize: '12px', flexShrink: 0 }}
+              >
+                跳
+              </button>
+            </div>
           </div>
 
           {loading ? (
             <div className="loading-spinner">加载中...</div>
-          ) : filtered.length === 0 ? (
+          ) : sorted.length === 0 ? (
             <div className="empty-state"><p>暂无章节</p></div>
           ) : (
             <div className={styles.chapterList}>
-              {filtered.map((ch) => (
+              {sorted.map((ch) => (
                 <div
                   key={ch.id}
                   className={`${styles.chapterItem} ${selectedId === ch.id ? styles.selected : ''}`}

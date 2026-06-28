@@ -144,25 +144,41 @@
 @media (max-width: 768px) {
   .kanban {
     flex-direction: column;
-    overflow-x: auto;
-    gap: 8px;
+    gap: 6px;
+    overflow-y: auto;
   }
 
-  .kanbanColumn {
+  .column {
+    flex: none;
+    min-width: unset;
+    max-width: unset;
     width: 100%;
-    min-width: 100%;
-    margin-bottom: 10px;
+  }
+
+  .columnBody {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 6px;
   }
 
   .kanbanCard {
-    padding: 10px;
-  }
-
-  .kanbanCard h4 {
-    font-size: 13px;
-  }
-
-  .kanbanCard p {
+    flex: 1 1 100%;
+    padding: 8px 10px;
+    margin-bottom: 0;
     font-size: 12px;
+  }
+
+  .cardContent {
+    font-size: 12px;
+  }
+
+  .cardActions {
+    gap: 2px;
+  }
+
+  .cardActions button {
+    font-size: 10px;
+    padding: 3px 6px;
   }
 }
