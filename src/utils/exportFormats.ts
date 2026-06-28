@@ -1,15 +1,15 @@
 /**
  * 导出增强工具
  * 支持 DOCX、PDF、EPUB 格式导出
+ * 所有函数返回 Blob，由调用方决定如何保存（原生环境用 nativeDownload，Web 用 saveAs）
  */
 
 import { jsPDF } from 'jspdf';
-import { Document, Packer, Paragraph, TextRun, HeadingLevel, PageBreak } from 'docx';
-import { saveAs } from 'file-saver';
+import { Document, Packer, Paragraph, TextRun, HeadingLevel } from 'docx';
 import type { Chapter, Character, Foreshadow, WorldSetting } from '../types';
 
 /** 导出上下文 */
-interface ExportContext {
+export interface ExportContext {
   projectName: string;
   chapters: Chapter[];
   characters: Character[];
@@ -29,7 +29,7 @@ export function buildExportContext(
 }
 
 // ========== PDF 导出 ==========
-export async function exportPDF(ctx: ExportContext): Promise<void> {
+export async function exportPDF(ctx: ExportContext): Promise<Blob> {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const margin = 20;
   const pageWidth = 210 - margin * 2;
@@ -100,11 +100,12 @@ export async function exportPDF(ctx: ExportContext): Promise<void> {
     }
   }
 
-  doc.save(`${ctx.projectName}.pdf`);
+  // 返回 Blob 而非直接保存
+  return doc.output('blob');
 }
 
 // ========== DOCX 导出 ==========
-export async function exportDOCX(ctx: ExportContext): Promise<void> {
+export async function exportDOCX(ctx: ExportContext): Promise<Blob> {
   const children: Paragraph[] = [];
 
   // 标题页
@@ -193,12 +194,11 @@ export async function exportDOCX(ctx: ExportContext): Promise<void> {
     sections: [{ properties: {}, children }],
   });
 
-  const blob = await Packer.toBlob(doc);
-  saveAs(blob, `${ctx.projectName}.docx`);
+  return await Packer.toBlob(doc);
 }
 
 // ========== EPUB 导出（简易版，生成 XHTML） ==========
-export function exportEPUB(ctx: ExportContext): void {
+export function exportEPUB(ctx: ExportContext): Blob {
   const sortedChapters = [...ctx.chapters].sort((a, b) => a.number - b.number);
 
   const chaptersHTML = sortedChapters.map((ch) => {
@@ -250,11 +250,7 @@ export function exportEPUB(ctx: ExportContext): void {
 </body>
 </html>`;
 
-  const blob = new Blob([html], { type: 'application/epub+zip' });
-  // 简易实现：导出为 HTML，用户可用 Calibre 等工具转换
-  // 真正的 EPUB 需要 zip 打包 + container.xml + content.opf，这里提供 HTML 版本
-  saveAs(blob, `${ctx.projectName}.html`);
-  alert('已导出为 HTML 文件（EPUB 简易版）。\n如需标准 EPUB，请用 Calibre 等工具将 HTML 转换为 EPUB。');
+  return new Blob([html], { type: 'text/html;charset=utf-8' });
 }
 
 function escapeHtml(s: string): string {

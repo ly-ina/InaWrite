@@ -310,9 +310,71 @@ function getComment(key: string): string {
   return FIELD_COMMENTS[key] || '';
 }
 
-export function downloadTemplateFile(data: unknown, filename: string): void {
-  // 使用带注释的序列化
+/**
+ * 在原生环境下载模板文件：
+ * 1. 写入 Filesystem (Directory.Cache，无需权限)
+ * 2. 调用 Share.share() 弹出系统分享对话框，用户可保存到"文件"或其他应用
+ */
+export async function downloadTemplateFile(data: unknown, filename: string): Promise<{ ok: boolean; error?: string; path?: string }> {
   const json = stringifyWithComments(data);
+  const isNative = !!(window as any).Capacitor?.isNativePlatform?.();
+
+  if (isNative) {
+    try {
+      const { Filesystem, Directory } = await import('@capacitor/filesystem');
+
+      // 写入 Cache 目录（无需权限，应用可访问）
+      const base64 = btoa(unescape(encodeURIComponent(json)));
+
+      const writeResult = await Filesystem.writeFile({
+        path: filename,
+        data: base64,
+        directory: Directory.Cache,
+      });
+
+      console.log('[模板下载] 写入成功:', writeResult.uri);
+
+      // 弹出系统分享对话框，让用户选择保存位置
+      try {
+        const { Share } = await import('@capacitor/share');
+        await Share.share({
+          title: '保存模板文件',
+          text: `下载文件：${filename}`,
+          url: writeResult.uri,
+          dialogTitle: '选择保存方式',
+        });
+      } catch (shareErr: any) {
+        // 用户取消分享不算失败
+        console.log('[模板下载] 分享取消或失败:', shareErr.message);
+      }
+
+      return { ok: true, path: `已通过分享保存：${filename}` };
+    } catch (err: any) {
+      console.error('[模板下载] 文件保存失败:', err);
+      return { ok: false, error: err.message || '未知错误' };
+    }
+  } else {
+    webDownload(json, filename);
+    return { ok: true };
+  }
+}
+
+/** Blob 转 base64 */
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = reader.result as string;
+      // 去掉 data:application/json;base64, 前缀
+      resolve(result.split(',')[1]);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+/** Web 标准下载 */
+function webDownload(json: string, filename: string): void {
   const blob = new Blob([json], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -323,6 +385,70 @@ export function downloadTemplateFile(data: unknown, filename: string): void {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+
+/**
+ * 通用原生下载函数：写入 Cache + 弹出 Share 对话框
+ * 适用于所有导出功能（JSON、PDF、DOCX、EPUB、Markdown 等）
+ * @param blob - 文件内容
+ * @param filename - 文件名
+ */
+export async function nativeDownload(blob: Blob, filename: string): Promise<void> {
+  const isNative = !!(window as any).Capacitor?.isNativePlatform?.();
+
+  if (isNative) {
+    try {
+      const { Filesystem, Directory } = await import('@capacitor/filesystem');
+
+      // Blob → base64（兼容二进制文件如 PDF/DOCX）
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const result = reader.result as string;
+          resolve(result.split(',')[1]);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+
+      const writeResult = await Filesystem.writeFile({
+        path: filename,
+        data: base64,
+        directory: Directory.Cache,
+      });
+
+      console.log('[nativeDownload] 写入成功:', writeResult.uri);
+
+      // 弹出分享对话框
+      try {
+        const { Share } = await import('@capacitor/share');
+        await Share.share({
+          title: '保存文件',
+          text: `下载文件：${filename}`,
+          url: writeResult.uri,
+          dialogTitle: '选择保存方式',
+        });
+      } catch (shareErr: any) {
+        console.log('[nativeDownload] 分享取消:', shareErr.message);
+      }
+    } catch (err: any) {
+      console.error('[nativeDownload] 失败:', err);
+      alert(`保存失败: ${err.message || '未知错误'}`);
+    }
+  } else {
+    // Web 环境：标准下载
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+}
+
+
+
 
 export async function generateFullExport(project: Project): Promise<ProjectExport> {
   const { db } = await import('../db/database');

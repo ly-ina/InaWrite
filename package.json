@@ -44,6 +44,8 @@
     "@capacitor/app": "^8.1.0",
     "@capacitor/cli": "^8.4.1",
     "@capacitor/core": "^8.4.1",
+    "@capacitor/filesystem": "^8.1.2",
+    "@capacitor/share": "^8.0.1",
     "@types/d3": "^7.4.3",
     "d3": "^7.9.0",
     "docx": "^9.7.1",

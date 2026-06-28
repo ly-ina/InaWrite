@@ -312,6 +312,7 @@ export default function Layout() {
             style={{ marginTop: '4px' }}>
             {t('nav.langSwitch')}
           </button>
+          <div style={{ margin: '4px 0', borderTop: '1px solid var(--border-color)' }} />
         </div>
       </aside>
 

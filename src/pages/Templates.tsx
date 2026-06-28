@@ -3,7 +3,7 @@
  * 各模块导入模板下载 + 完整项目导出 + 数据导入
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAppStore } from '../store/appStore';
 import {
   getCharacterTemplate, getChapterTemplate, getForeshadowTemplate,
@@ -16,7 +16,16 @@ import { useChapterStore } from '../store/chapterStore';
 import { useCharacterStore } from '../store/characterStore';
 import { useForeshadowStore } from '../store/foreshadowStore';
 import { useWorldSettingStore } from '../store/worldSettingStore';
+import { nativeDownload } from '../utils/templates';
 import styles from './Templates.module.css';
+
+/** 已下载文件信息 */
+interface DownloadedFile {
+  name: string;
+  path: string;
+  size: number;
+  time: string;
+}
 
 /** 各模块模板配置 */
 const MODULE_TEMPLATES = [
@@ -42,37 +51,127 @@ export default function TemplatesPage() {
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importStatus, setImportStatus] = useState<string>('');
 
-  // 加载数据
+  // 已下载文件管理
+  const [downloadedFiles, setDownloadedFiles] = useState<DownloadedFile[]>([]);
+  const [showFiles, setShowFiles] = useState(true);
+
+  /** 扫描 Cache 目录中的已下载文件 */
+  const scanDownloads = useCallback(async () => {
+    const isNative = !!(window as any).Capacitor?.isNativePlatform?.();
+    if (!isNative) {
+      console.log('[文件管理] 非原生环境，跳过扫描');
+      return;
+    }
+    try {
+      const { Filesystem, Directory } = await import('@capacitor/filesystem');
+
+      const result = await Filesystem.readdir({
+        path: '',
+        directory: Directory.Cache,
+      });
+      // 只显示 .json 文件
+      const jsonFiles = (result.files || []).filter((f: any) => f.name.endsWith('.json'));
+      console.log('[文件管理] 扫描结果:', jsonFiles);
+      const files: DownloadedFile[] = jsonFiles.map((f: any) => ({
+        name: f.name,
+        path: f.uri,
+        size: f.size || 0,
+        time: f.mtime ? new Date(f.mtime * 1000).toLocaleString() : '',
+      }));
+      setDownloadedFiles(files);
+    } catch (err: any) {
+      console.error('[文件管理] 扫描失败:', err);
+      // 目录不存在时不报错，显示空列表
+      setDownloadedFiles([]);
+    }
+  }, []);
+
+  /** 删除文件（从 Cache 目录） */
+  const deleteDownloaded = async (filename: string) => {
+    const isNative = !!(window as any).Capacitor?.isNativePlatform?.();
+    if (!isNative) {
+      alert('请在移动端应用中管理文件');
+      return;
+    }
+    try {
+      const { Filesystem, Directory } = await import('@capacitor/filesystem');
+      await Filesystem.deleteFile({
+        path: filename,
+        directory: Directory.Cache,
+      });
+      await scanDownloads();
+    } catch {
+      alert('删除失败');
+    }
+  };
+
+  /** 打开/分享已下载的文件 */
+  const openDownloadedFile = async (filename: string) => {
+    const isNative = !!(window as any).Capacitor?.isNativePlatform?.();
+    if (!isNative) return;
+
+    try {
+      const { Filesystem, Directory } = await import('@capacitor/filesystem');
+      const { Share } = await import('@capacitor/share');
+      const stat = await Filesystem.stat({
+        path: filename,
+        directory: Directory.Cache,
+      });
+      await Share.share({
+        title: filename,
+        url: stat.uri,
+        dialogTitle: '选择打开方式',
+      });
+    } catch {
+      // 用户取消分享或失败，静默忽略
+    }
+  };
+
+  // 加载数据 + 扫描已下载文件
   useEffect(() => {
     if (currentProject) {
       loadChapters(currentProject.id);
       loadCharacters(currentProject.id);
       loadForeshadows(currentProject.id);
       loadSettings(currentProject.id);
+      scanDownloads();
     }
-  }, [currentProject, loadChapters, loadCharacters, loadForeshadows, loadSettings]);
+  }, [currentProject, loadChapters, loadCharacters, loadForeshadows, loadSettings, scanDownloads]);
 
   /** 下载模板 */
-  const handleDownloadTemplate = (key: string) => {
+  const handleDownloadTemplate = async (key: string) => {
     if (!currentProject) return;
     const tpl = MODULE_TEMPLATES.find((t) => t.key === key);
     if (!tpl) return;
     const data = tpl.generator(currentProject.id);
-    downloadTemplateFile(data, `${key}-template.json`);
+    const result = await downloadTemplateFile(data, `${key}-template.json`);
+    if (result.ok) {
+      alert(`✅ ${tpl.label} 已保存`);
+      setTimeout(() => scanDownloads(), 300);
+    } else {
+      alert(`❌ 保存失败: ${result.error}`);
+    }
   };
 
   /** 导出完整项目 */
   const handleFullExport = async () => {
     if (!currentProject) return;
     const data = await generateFullExport(currentProject);
-    downloadTemplateFile(data, `${currentProject.name}-完整设定.json`);
+    const result = await downloadTemplateFile(data, `${currentProject.name}-完整设定.json`);
+    if (result.ok) {
+      alert('✅ 完整设定已保存');
+      setTimeout(() => scanDownloads(), 300);
+    } else {
+      alert(`❌ 保存失败: ${result.error}`);
+    }
   };
 
   /** 导出 JSON 格式 */
   const handleExportJSON = async () => {
     if (!currentProject) return;
     const json = await exportProject(currentProject);
-    downloadJSON(json, `${currentProject.name}-${new Date().toISOString().slice(0, 10)}.json`);
+    const blob = new Blob([json], { type: 'application/json' });
+    await nativeDownload(blob, `${currentProject.name}-${new Date().toISOString().slice(0, 10)}.json`);
   };
 
   /** 构建导出上下文 */
@@ -85,21 +184,25 @@ export default function TemplatesPage() {
   const handleExportPDF = async () => {
     const ctx = getExportCtx();
     if (!ctx) return;
-    await exportPDF(ctx);
+    const blob = await exportPDF(ctx);
+    await nativeDownload(blob, `${ctx.projectName}.pdf`);
   };
 
   /** 导出 DOCX */
   const handleExportDOCX = async () => {
     const ctx = getExportCtx();
     if (!ctx) return;
-    await exportDOCX(ctx);
+    const blob = await exportDOCX(ctx);
+    await nativeDownload(blob, `${ctx.projectName}.docx`);
   };
 
-  /** 导出 EPUB */
-  const handleExportEPUB = () => {
+  /** 导出 EPUB/HTML */
+  const handleExportEPUB = async () => {
     const ctx = getExportCtx();
     if (!ctx) return;
-    exportEPUB(ctx);
+    const blob = exportEPUB(ctx);
+    await nativeDownload(blob, `${ctx.projectName}.html`);
+    alert('已导出为 HTML 文件（EPUB 简易版）。\n如需标准 EPUB，请用 Calibre 等工具将 HTML 转换为 EPUB。');
   };
 
   /** 导出创作报告 */
@@ -107,15 +210,8 @@ export default function TemplatesPage() {
     if (!currentProject) return;
     const data = await generateFullExport(currentProject);
     const report = generateReport(data);
-    const blob = new Blob([report], { type: 'text/markdown' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${currentProject.name}-创作报告.md`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    const blob = new Blob([report], { type: 'text/markdown;charset=utf-8' });
+    await nativeDownload(blob, `${currentProject.name}-创作报告.md`);
   };
 
   /** 导入 JSON（默认覆盖更新） */
@@ -148,7 +244,40 @@ export default function TemplatesPage() {
       <div className={styles.grid}>
         {/* 各模块导入模板 */}
         <section className={styles.section}>
-          <h3>📥 导入模板下载</h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <h3 style={{ margin: 0 }}>📥 导入模板下载</h3>
+            <button
+              className="btn btn-sm"
+              onClick={() => { setShowFiles(!showFiles); if (!showFiles) scanDownloads(); }}
+            >
+              📁 已下载文件 {downloadedFiles.length > 0 ? `(${downloadedFiles.length})` : ''}
+            </button>
+          </div>
+          {showFiles && (
+            <div className={styles.fileManager} style={{ marginBottom: '12px' }}>
+              {downloadedFiles.length === 0 ? (
+                <div className={styles.fileEmpty}>暂无已下载的模板文件</div>
+              ) : (
+                <div className={styles.fileList}>
+                  {downloadedFiles.map((f) => (
+                    <div key={f.name} className={styles.fileItem}>
+                      <span className={styles.fileIcon}>📄</span>
+                      <div
+                        className={styles.fileInfo}
+                        style={{ cursor: 'pointer', flex: 1 }}
+                        onClick={() => openDownloadedFile(f.name)}
+                        title="点击查看/分享文件"
+                      >
+                        <span className={styles.fileName}>{f.name}</span>
+                        <span className={styles.fileMeta}>{(f.size / 1024).toFixed(1)} KB{f.time ? ` · ${f.time}` : ''}</span>
+                      </div>
+                      <button className="btn btn-sm btn-ghost" style={{ color: 'var(--danger)' }} onClick={() => deleteDownloaded(f.name)}>🗑</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           <p className={styles.sectionDesc}>
             下载标准 JSON 模板，文件内含详细字段注释。填入数据后通过下方「数据导入」批量导入。
           </p>

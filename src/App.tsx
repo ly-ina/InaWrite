@@ -4,9 +4,10 @@
  * 包含 Android 返回按钮处理：按导航栈逐级返回，顶层弹窗确认退出
  */
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { App as CapacitorApp } from '@capacitor/app';
+import ConfirmDialog from './components/ConfirmDialog';
 import Layout from './components/Layout';
 import DashboardPage from './pages/Dashboard';
 import ProjectsPage from './pages/Projects';
@@ -38,7 +39,7 @@ export default function App() {
 /** 路由 + Android 返回按钮处理 */
 function AppRoutes() {
   const navStackRef = useRef<string[]>([]);
-  const exitBlockedRef = useRef(false);
+  const [exitDialog, setExitDialog] = useState(false);
 
   // 维护导航历史栈（HashRouter 下 window.history.back 不可靠）
   useEffect(() => {
@@ -96,14 +97,8 @@ function AppRoutes() {
             stack.pop();
             window.location.hash = '#' + prev;
           } else {
-            // 5. 顶层 → 确认退出
-            if (exitBlockedRef.current) return;
-            exitBlockedRef.current = true;
-            const exit = window.confirm('确定要退出应用吗？');
-            exitBlockedRef.current = false;
-            if (exit) {
-              CapacitorApp.exitApp();
-            }
+            // 5. 顶层 → 弹出确认退出弹窗
+            setExitDialog(true);
           }
         });
       } catch (err) {
@@ -119,24 +114,38 @@ function AppRoutes() {
   }, []);
 
   return (
-    <Routes>
-      <Route path="/" element={<Layout />}>
-        <Route index element={<Navigate to="/projects" replace />} />
-        <Route path="dashboard" element={<DashboardPage />} />
-        <Route path="projects" element={<ProjectsPage />} />
-        <Route path="characters" element={<CharactersPage />} />
-        <Route path="chapters" element={<ChaptersPage />} />
-        <Route path="timeline" element={<TimelinePage />} />
-        <Route path="foreshadows" element={<ForeshadowsPage />} />
-        <Route path="worldsettings" element={<WorldSettingsPage />} />
-        <Route path="resources" element={<ResourcesPage />} />
-        <Route path="templates" element={<TemplatesPage />} />
-        <Route path="ai" element={<AIAssistantPage />} />
-        <Route path="outline" element={<OutlinePage />} />
-        <Route path="tags" element={<TagsPage />} />
-        <Route path="about" element={<AboutPage />} />
-      </Route>
-    </Routes>
+    <>
+      <Routes>
+        <Route path="/" element={<Layout />}>
+          <Route index element={<Navigate to="/projects" replace />} />
+          <Route path="dashboard" element={<DashboardPage />} />
+          <Route path="projects" element={<ProjectsPage />} />
+          <Route path="characters" element={<CharactersPage />} />
+          <Route path="chapters" element={<ChaptersPage />} />
+          <Route path="timeline" element={<TimelinePage />} />
+          <Route path="foreshadows" element={<ForeshadowsPage />} />
+          <Route path="worldsettings" element={<WorldSettingsPage />} />
+          <Route path="resources" element={<ResourcesPage />} />
+          <Route path="templates" element={<TemplatesPage />} />
+          <Route path="ai" element={<AIAssistantPage />} />
+          <Route path="outline" element={<OutlinePage />} />
+          <Route path="tags" element={<TagsPage />} />
+          <Route path="about" element={<AboutPage />} />
+        </Route>
+      </Routes>
+
+      {/* 退出确认弹窗 */}
+      {exitDialog && (
+        <ConfirmDialog
+          title="退出应用"
+          message="确定要退出 Novel InaKB 吗？"
+          confirmLabel="退出"
+          danger
+          onConfirm={() => CapacitorApp.exitApp()}
+          onCancel={() => setExitDialog(false)}
+        />
+      )}
+    </>
   );
 }
 
