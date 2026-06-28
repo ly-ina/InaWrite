@@ -15,7 +15,7 @@ const GITHUB_API = 'https://api.github.com/repos/ly-ina/InaWrite/releases/latest
 /** 当前平台 */
 function getPlatform(): 'android' | 'pc' | 'web' {
   if (!!(window as any).Capacitor?.isNativePlatform?.()) return 'android';
-  if (!!(window as any).electronBridge?.isElectron) return 'pc';
+  if (!!(window as any).electronAPI) return 'pc';
   return 'web';
 }
 

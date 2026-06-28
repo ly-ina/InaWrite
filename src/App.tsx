@@ -50,7 +50,7 @@ function AppRoutes() {
   // OTA 更新检测
   const doUpdateCheck = useCallback(async (silent = false) => {
     const isNative = !!(window as any).Capacitor?.isNativePlatform?.();
-    const isElectron = !!(window as any).electronBridge?.isElectron;
+    const isElectron = !!(window as any).electronAPI;
     if (!isNative && !isElectron) {
       if (!silent) alert('当前为浏览器环境，无法检测更新');
       return 'web';
