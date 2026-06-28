@@ -9,7 +9,7 @@ files:
   - public/**/*
   - package.json
 win:
-  icon: public/favicon.svg
+  target: [dir]
 mac:
   target: [dmg, zip]
   icon: public/favicon.svg
