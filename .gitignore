@@ -2,7 +2,10 @@ node_modules/
 dist/
 .vite/
 *.local
+.env*
 .DS_Store
+Thumbs.db
+*.log
 dist-electron/
 release/
 *.asar
@@ -15,5 +18,5 @@ android/build/
 android/captures/
 *.apk
 *.aab
-.build-hashes.json 
-keystore-base64.txt 
+.build-hashes.json
+keystore-base64.txt
